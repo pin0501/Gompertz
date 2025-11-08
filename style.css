@@ -1347,6 +1347,7 @@ textarea.form-control {
   background: var(--color-secondary);
   outline: none;
   -webkit-appearance: none;
+  appearance: none;
 }
 
 .slider::-webkit-slider-thumb {
