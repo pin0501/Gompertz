@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gompertz 曲線建模平台 - 平台介入效應分析</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header class="app-header">
+            <h1>Gompertz 曲線建模平台</h1>
+            <p class="subtitle">平台介入效應分析與預測系統</p>
+        </header>
+
+        <!-- Progress Steps -->
+        <div class="progress-steps">
+            <div class="step active" data-step="1">
+                <div class="step-number">1</div>
+                <div class="step-label">數據輸入</div>
+            </div>
+            <div class="step" data-step="2">
+                <div class="step-number">2</div>
+                <div class="step-label">基線擬合</div>
+            </div>
+            <div class="step" data-step="3">
+                <div class="step-number">3</div>
+                <div class="step-label">情境配置</div>
+            </div>
+            <div class="step" data-step="4">
+                <div class="step-number">4</div>
+                <div class="step-label">結果分析</div>
+            </div>
+        </div>
+
+        <!-- Step 1: Data Input -->
+        <div class="section" id="step1" style="display: block;">
+            <div class="section-header">
+                <h2>步驟 1: 數據輸入與品質檢測</h2>
+                <p>輸入歷史時間序列數據，系統將自動檢測缺漏值與異常</p>
+            </div>
+
+            <div class="card">
+                <div class="card__body">
+                    <div class="form-group">
+                        <label class="form-label">數據輸入方式</label>
+                        <div class="button-group">
+                            <button class="btn btn--secondary" id="loadSampleBtn">載入範例數據</button>
+                            <button class="btn btn--outline" id="clearDataBtn">清除數據</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="dataInput">貼上數據 (格式: 期間,帳戶數)</label>
+                        <textarea class="form-control" id="dataInput" rows="8" placeholder="Q1 2020,28988&#10;Q2 2020,75699&#10;Q3 2020,170312&#10;..."></textarea>
+                    </div>
+
+                    <div class="settings-grid">
+                        <div class="form-group">
+                            <label class="form-label" for="startPeriod">
+                                起始期間
+                                <span class="tooltip" data-tip="例如: Q1 2020">ⓘ</span>
+                            </label>
+                            <input type="text" class="form-control" id="startPeriod" value="Q1 2020">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="historicalQuarters">
+                                歷史季數
+                                <span class="tooltip" data-tip="歷史數據的季度數量">ⓘ</span>
+                            </label>
+                            <input type="number" class="form-control" id="historicalQuarters" value="20" min="8">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="forecastYears">
+                                預測年數
+                                <span class="tooltip" data-tip="需要預測的未來年數">ⓘ</span>
+                            </label>
+                            <input type="number" class="form-control" id="forecastYears" value="8" min="1" max="20">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Data Quality Report -->
+            <div class="card" id="dataQualityCard" style="display: none;">
+                <div class="card__header">
+                    <h3>數據品質報告</h3>
+                    <span class="tooltip" data-tip="數據品質影響模型可靠性。分數越高，預測越可靠。">ⓘ</span>
+                </div>
+                <div class="card__body">
+                    <div id="qualityScoreContainer" class="quality-score-container">
+                        <div class="quality-score-label">數據品質分數</div>
+                        <div class="quality-score-bar">
+                            <div class="quality-score-fill" id="qualityScoreFill"></div>
+                        </div>
+                        <div class="quality-score-value" id="qualityScoreValue">--/100</div>
+                    </div>
+                    <div id="qualityIssues" class="quality-issues"></div>
+                    <div id="qualityRecommendations" class="quality-recommendations"></div>
+                </div>
+            </div>
+
+            <!-- Interactive Data Table -->
+            <div class="card" id="dataPreviewCard" style="display: none;">
+                <div class="card__header">
+                    <h3>數據預覽與編輯</h3>
+                </div>
+                <div class="card__body">
+                    <div class="data-type-legend">
+                        <div class="legend-item">
+                            <div class="legend-color original"></div>
+                            <span>原始數據</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color missing"></div>
+                            <span>缺漏數據</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color interpolated"></div>
+                            <span>已插值</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color outlier"></div>
+                            <span>異常值</span>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table" id="dataPreviewTable">
+                            <thead>
+                                <tr>
+                                    <th>期間</th>
+                                    <th>實際數值</th>
+                                    <th>狀態</th>
+                                    <th>異常?</th>
+                                    <th>建議</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <div id="dataError" class="error-message" style="display: none;"></div>
+                </div>
+            </div>
+
+            <!-- Missing Data Handling Options -->
+            <div class="card" id="missingDataCard" style="display: none;">
+                <div class="card__header">
+                    <h3>缺漏數據處理策略</h3>
+                </div>
+                <div class="card__body">
+                    <div style="background: var(--color-bg-2); padding: var(--space-12); border-radius: var(--radius-base); margin-bottom: var(--space-16); font-size: var(--font-size-sm);">
+                        <strong>💡 為什麼重要？</strong><br>
+                        Gompertz 擬合對缺漏數據敏感 - 缺漏值可能使參數估計偏移 1-3%。插值可減少不確定性。
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">選擇處理方法</label>
+                        <div class="interpolation-options">
+                            <label class="radio-option">
+                                <input type="radio" name="interpolation" value="ignore" checked>
+                                <div class="radio-content">
+                                    <div class="radio-title">忽略 (Ignore)</div>
+                                    <div class="radio-description">跳過缺漏季度 (適用於 1-2 個缺漏)</div>
+                                </div>
+                            </label>
+                            <label class="radio-option">
+                                <input type="radio" name="interpolation" value="linear">
+                                <div class="radio-content">
+                                    <div class="radio-title">線性插值 (Linear)</div>
+                                    <div class="radio-description">在相鄰值之間繪製直線</div>
+                                </div>
+                            </label>
+                            <label class="radio-option">
+                                <input type="radio" name="interpolation" value="gompertz">
+                                <div class="radio-content">
+                                    <div class="radio-title">Gompertz 插值 (推薦) ⭐</div>
+                                    <div class="radio-description">使用初步擬合估計缺漏值 - 最適合成長數據</div>
+                                </div>
+                            </label>
+                            <label class="radio-option">
+                                <input type="radio" name="interpolation" value="forward">
+                                <div class="radio-content">
+                                    <div class="radio-title">向前填充 (Forward-Fill)</div>
+                                    <div class="radio-description">重複前一個值 (保守方法)</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                    <div id="interpolationImpact" class="interpolation-impact" style="display: none;"></div>
+                    <button class="btn btn--primary" id="applyInterpolationBtn">應用並預覽</button>
+                </div>
+            </div>
+
+            <!-- Best Practices Panel -->
+            <div class="card" id="bestPracticesCard" style="display: none;">
+                <div class="card__header">
+                    <h3>📊 缺漏數據處理最佳實踐</h3>
+                </div>
+                <div class="card__body">
+                    <div class="best-practices-panel">
+                        <ol>
+                            <li><strong>優先檢查數據源</strong> - 缺漏的季度數據是否可以從原始來源獲取？</li>
+                            <li><strong>實際數據永遠優於插值</strong> - 如果可以獲取實際值，一定要優先使用</li>
+                            <li><strong>少量缺漏 (&lt;3 季度)</strong> - 可使用 Gompertz 插值方法填補</li>
+                            <li><strong>大量缺漏 (3+ 季度)</strong> - 考慮是否縮短分析期間或獲取更多數據</li>
+                            <li><strong>文檔記錄</strong> - 在最終報告中明確標明哪些值是插值得出</li>
+                            <li><strong>驗證結果</strong> - 比較不同插值方法的結果，確保合理性</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button class="btn btn--primary" id="validateDataBtn">驗證並繼續</button>
+            </div>
+        </div>
+
+        <!-- Step 2: Baseline Fitting -->
+        <div class="section" id="step2" style="display: none;">
+            <div class="section-header">
+                <h2>步驟 2: 基線模型擬合</h2>
+                <p>自動擬合 Gompertz 曲線並評估模型品質</p>
+            </div>
+
+            <div class="card">
+                <div class="card__header">
+                    <h3>擬合參數</h3>
+                </div>
+                <div class="card__body">
+                    <div id="fittingStatus" class="status-message">正在擬合模型...</div>
+                    <div id="parametersDisplay" style="display: none;">
+                        <div class="params-grid">
+                            <div class="param-card">
+                                <div class="param-label">K (承載容量)</div>
+                                <div class="param-value" id="paramK">-</div>
+                                <div class="param-ci" id="paramK_ci">-</div>
+                            </div>
+                            <div class="param-card">
+                                <div class="param-label">b (成長率)</div>
+                                <div class="param-value" id="paramB">-</div>
+                                <div class="param-ci" id="paramB_ci">-</div>
+                            </div>
+                            <div class="param-card">
+                                <div class="param-label">t₀ (轉折點)</div>
+                                <div class="param-value" id="paramT0">-</div>
+                                <div class="param-ci" id="paramT0_ci">-</div>
+                            </div>
+                        </div>
+                        <div class="metrics-grid">
+                            <div class="metric-item">
+                                <span class="metric-label">R² (擬合優度):</span>
+                                <span class="metric-value" id="metricR2">-</span>
+                            </div>
+                            <div class="metric-item">
+                                <span class="metric-label">殘差標準差:</span>
+                                <span class="metric-value" id="metricRMSE">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Manual K Override -->
+            <div class="card" id="manualKCard" style="display: none;">
+                <div class="card__header">
+                    <h3>承載容量 (K) 設定</h3>
+                    <span class="tooltip" data-tip="K 代表市場的總可達市場規模 (TAM)">ⓘ</span>
+                </div>
+                <div class="card__body">
+                    <div style="background: var(--color-bg-2); padding: var(--space-12); border-radius: var(--radius-base); margin-bottom: var(--space-16); font-size: var(--font-size-sm);">
+                        <strong>💡 什麼是 K？</strong><br>
+                        K 代表您的市場總可達市場規模 (TAM - Total Addressable Market)。如果您有市場研究數據指出特定的 TAM，可以在此輸入。否則，使用自動擬合值。
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">自動擬合的 K 值</label>
+                        <input type="text" class="form-control" id="autoFittedK" readonly style="background: var(--color-secondary);">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="radio-option" style="padding: var(--space-12); cursor: pointer;">
+                            <input type="checkbox" id="useCustomK" style="margin-right: var(--space-8);">
+                            <span style="font-weight: var(--font-weight-semibold);">使用自訂 K 值</span>
+                        </label>
+                    </div>
+                    
+                    <div id="customKSection" style="display: none;">
+                        <div class="form-group">
+                            <label class="form-label" for="customKValue">自訂 K 值</label>
+                            <input type="number" class="form-control" id="customKValue" placeholder="輸入自訂 K 值">
+                        </div>
+                        <div id="kWarning" style="display: none; margin-top: var(--space-8);"></div>
+                        <button class="btn btn--primary" id="applyCustomK">套用自訂 K</button>
+                    </div>
+                    
+                    <div id="currentKStatus" style="margin-top: var(--space-16); padding: var(--space-12); background: var(--color-bg-3); border-radius: var(--radius-base); font-weight: var(--font-weight-medium);">
+                        目前使用: <span id="currentKValue">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card__header">
+                    <h3>擬合結果可視化</h3>
+                </div>
+                <div class="card__body">
+                    <div class="chart-container">
+                        <canvas id="fittingChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button class="btn btn--outline" id="backToStep1">返回</button>
+                <button class="btn btn--primary" id="proceedToStep3">繼續配置情境</button>
+            </div>
+        </div>
+
+        <!-- Step 3: Scenario Configuration -->
+        <div class="section" id="step3" style="display: none;">
+            <div class="section-header">
+                <h2>步驟 3: 平台加速參數配置</h2>
+                <p>配置平台對採用速度的加速效應（不改變市場容量 K）</p>
+            </div>
+
+            <!-- Key Insight Box -->
+            <div class="card" style="background: var(--color-bg-2); border: 2px solid var(--color-primary);">
+                <div class="card__header">
+                    <h3>⚡ 關鍵概念</h3>
+                </div>
+                <div class="card__body" style="font-size: var(--font-size-base);">
+                    <p style="margin-bottom: var(--space-12); font-weight: var(--font-weight-semibold);">平台的價值不在於擴大市場規模（K 保持固定），而在於加速採用速度。</p>
+                    <p style="margin-bottom: var(--space-12);">提早採用意味著：</p>
+                    <ul style="margin: 0 0 var(--space-12) var(--space-20); padding: 0;">
+                        <li style="margin-bottom: var(--space-8);">✓ 在高成長季度獲得更多收益</li>
+                        <li style="margin-bottom: var(--space-8);">✓ 更快回應競爭對手</li>
+                        <li style="margin-bottom: var(--space-8);">✓ 更多數據用於產品迭代</li>
+                        <li style="margin-bottom: var(--space-8);">✓ 網路效應更早啟動</li>
+                    </ul>
+                    <p style="background: var(--color-bg-3); padding: var(--space-12); border-radius: var(--radius-base); margin: 0;">
+                        <strong>這種時間優勢在 8 年期間價值數百萬。</strong>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Model Details -->
+            <div class="card">
+                <div class="card__header">
+                    <h3>📐 數學模型</h3>
+                </div>
+                <div class="card__body">
+                    <div style="background: var(--color-surface); padding: var(--space-16); border-radius: var(--radius-base); border: 1px solid var(--color-border); font-family: var(--font-family-mono); font-size: var(--font-size-sm);">
+                        <strong>Gompertz 模型：</strong><br>
+                        N(t) = K × exp(-exp(-b(t)×(t-t₀)))<br><br>
+                        <strong>平台加速效應：</strong><br>
+                        b(t) = b₀ × [1 + α × exp(-ln(2)/H × (t-T))]  當 t ≥ T<br>
+                        b(t) = b₀  當 t &lt; T<br><br>
+                        <strong>參數說明：</strong><br>
+                        • K = 市場容量（固定，所有情境相同）<br>
+                        • b₀ = 基線成長速度<br>
+                        • t₀ = 轉折點<br>
+                        • α = 相對成長加速 (0.1 = 10%, 0.2 = 20%)<br>
+                        • H = 半衰期（季度）<br>
+                        • T = 平台啟動時間
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card__body">
+                    <div class="form-group">
+                        <label class="form-label">預設情境</label>
+                        <div class="button-group">
+                            <button class="btn btn--secondary scenario-preset" data-scenario="conservative">保守型</button>
+                            <button class="btn btn--secondary scenario-preset" data-scenario="moderate">穩健型</button>
+                            <button class="btn btn--secondary scenario-preset" data-scenario="aggressive">積極型</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="platformLaunch">
+                            平台啟動季度（Q1 2025 = 季度 1）
+                            <span class="tooltip" data-tip="平台在預測期的第幾季開始生效">ⓘ</span>
+                        </label>
+                        <input type="number" class="form-control" id="platformLaunch" value="3" min="1">
+                        <div style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-top: var(--space-4);">例如：3 = Q3 2025</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Parameter Guide -->
+            <div class="card" style="background: var(--color-bg-3);">
+                <div class="card__header">
+                    <h3>📊 參數選擇指南</h3>
+                </div>
+                <div class="card__body" style="font-size: var(--font-size-sm);">
+                    <div style="margin-bottom: var(--space-16);">
+                        <strong>α (成長加速率)：</strong><br>
+                        • 0-10%: 保守型，低風險估計<br>
+                        • 10-20%: 穩健型，現實估計<br>
+                        • 20-35%: 積極型，高影響情境<br>
+                        • &gt;35%: 不切實際 - 平台很少能使採用速度翻倍以上
+                    </div>
+                    <div>
+                        <strong>H (半衰期，季度)：</strong><br>
+                        • 4-6 季度: 平台影響快速減弱（短期熱潮）<br>
+                        • 6-10 季度: 持續提升（良好的產品市場契合度）<br>
+                        • 10+ 季度: 平台效應長期持續（強網路效應）
+                    </div>
+                </div>
+            </div>
+
+            <div class="scenarios-container">
+                <div class="scenario-card" data-scenario="conservative">
+                    <h3>保守型情境</h3>
+                    <div style="background: var(--color-bg-1); padding: var(--space-12); border-radius: var(--radius-base); margin-bottom: var(--space-16); font-size: var(--font-size-sm);">
+                        輕微的平台提升效果，快速衰減
+                    </div>
+                    <div class="param-sliders">
+                        <div class="slider-group">
+                            <label>α (成長加速率): <span id="alpha_conservative_val">10</span>%</label>
+                            <input type="range" class="slider" id="alpha_conservative" min="0" max="50" step="1" value="10">
+                            <div class="param-description">採用速度在平台影響期提升 10%</div>
+                        </div>
+                        <div class="slider-group">
+                            <label>H (半衰期): <span id="half_life_conservative_val">6</span> 季度</label>
+                            <input type="range" class="slider" id="half_life_conservative" min="2" max="16" step="1" value="6">
+                            <div class="param-description">加速效應在 6 季度後減半</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="scenario-card" data-scenario="moderate">
+                    <h3>穩健型情境</h3>
+                    <div style="background: var(--color-bg-3); padding: var(--space-12); border-radius: var(--radius-base); margin-bottom: var(--space-16); font-size: var(--font-size-sm);">
+                        平衡的提升效果，中等持續性
+                    </div>
+                    <div class="param-sliders">
+                        <div class="slider-group">
+                            <label>α (成長加速率): <span id="alpha_moderate_val">20</span>%</label>
+                            <input type="range" class="slider" id="alpha_moderate" min="0" max="50" step="1" value="20">
+                            <div class="param-description">採用速度在平台影響期提升 20%</div>
+                        </div>
+                        <div class="slider-group">
+                            <label>H (半衰期): <span id="half_life_moderate_val">8</span> 季度</label>
+                            <input type="range" class="slider" id="half_life_moderate" min="2" max="16" step="1" value="8">
+                            <div class="param-description">加速效應在 8 季度（2年）後減半</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="scenario-card" data-scenario="aggressive">
+                    <h3>積極型情境</h3>
+                    <div style="background: var(--color-bg-4); padding: var(--space-12); border-radius: var(--radius-base); margin-bottom: var(--space-16); font-size: var(--font-size-sm);">
+                        強勁的平台提升，持續時間更長
+                    </div>
+                    <div class="param-sliders">
+                        <div class="slider-group">
+                            <label>α (成長加速率): <span id="alpha_aggressive_val">35</span>%</label>
+                            <input type="range" class="slider" id="alpha_aggressive" min="0" max="50" step="1" value="35">
+                            <div class="param-description">採用速度在平台影響期提升 35%</div>
+                        </div>
+                        <div class="slider-group">
+                            <label>H (半衰期): <span id="half_life_aggressive_val">10</span> 季度</label>
+                            <input type="range" class="slider" id="half_life_aggressive" min="2" max="16" step="1" value="10">
+                            <div class="param-description">加速效應在 10 季度後減半</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button class="btn btn--outline" id="backToStep2">返回</button>
+                <button class="btn btn--primary" id="proceedToStep4">生成預測結果</button>
+            </div>
+        </div>
+
+        <!-- Step 4: Results & Analysis -->
+        <div class="section" id="step4" style="display: none;">
+            <div class="section-header">
+                <h2>步驟 4: 比較預測與分析</h2>
+                <p>查看不同情境的預測結果與效益分析</p>
+            </div>
+
+            <div class="card">
+                <div class="card__header">
+                    <h3>預測趨勢圖</h3>
+                </div>
+                <div class="card__body">
+                    <div class="chart-container">
+                        <canvas id="forecastChart"></canvas>
+                    </div>
+                    
+                    <div class="chart-controls" style="margin-top: var(--space-16); display: flex; gap: var(--space-8); flex-wrap: wrap;">
+                        <button class="btn btn--sm btn--outline" id="exportPNG">下載 PNG</button>
+                        <button class="btn btn--sm btn--outline" id="exportSVG">下載 SVG</button>
+                        <button class="btn btn--sm btn--outline" id="exportPDF">下載 PDF</button>
+                    </div>
+                    
+                    <div id="exportMessage" style="display: none; margin-top: var(--space-12);"></div>
+                </div>
+            </div>
+            
+            <!-- Explanation Box -->
+            <div class="card" style="background: var(--color-bg-2); border: 2px solid var(--color-primary);">
+                <div class="card__header">
+                    <h3>📊 如何閱讀此圖表</h3>
+                </div>
+                <div class="card__body" style="font-size: var(--font-size-sm);">
+                    <p style="margin-bottom: var(--space-12);">• 所有線條收斂到相同點（K ≈ <span id="explainK" style="font-weight: var(--font-weight-semibold);">-</span>）因為這是市場上限</p>
+                    <p style="margin-bottom: var(--space-12);">• 平台不會改變市場規模 - 它加速採用速度</p>
+                    <p style="margin-bottom: var(--space-12);">• <strong>真正的效益：</strong>穩健型情境提前約 <span id="timingSaved" style="font-weight: var(--font-weight-semibold); color: var(--color-success);">-</span> 季度達到高滲透率</p>
+                    <p style="background: var(--color-bg-3); padding: var(--space-12); border-radius: var(--radius-base); margin: 0;">
+                        <strong>💰 這種時間差異很有價值：</strong>提前 12 個月達到高滲透市場 = 額外 12 個月的收入
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Summary Table -->
+            <div class="card">
+                <div class="card__header">
+                    <h3>關鍵數據摘要</h3>
+                </div>
+                <div class="card__body">
+                    <div class="table-container">
+                        <table class="data-table" id="summaryComparisonTable">
+                            <thead>
+                                <tr>
+                                    <th>時間點</th>
+                                    <th>基線</th>
+                                    <th>保守型</th>
+                                    <th>穩健型</th>
+                                    <th>積極型</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+
+
+            <div class="card">
+                <div class="card__header">
+                    <h3>預測數據表</h3>
+                    <div class="chart-controls">
+                        <button class="btn btn--sm btn--outline" id="exportCSVBtn">匯出 CSV</button>
+                    </div>
+                </div>
+                <div class="card__body">
+                    <div class="table-container">
+                        <table class="data-table" id="forecastTable">
+                            <thead>
+                                <tr>
+                                    <th>期間</th>
+                                    <th>基線</th>
+                                    <th>保守型</th>
+                                    <th>保守增量</th>
+                                    <th>穩健型</th>
+                                    <th>穩健增量</th>
+                                    <th>積極型</th>
+                                    <th>積極增量</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Timing Milestones -->
+            <div class="card" style="background: var(--color-bg-3);">
+                <div class="card__header">
+                    <h3>⏱️ 時間優勢分析</h3>
+                </div>
+                <div class="card__body">
+                    <div id="timingMilestones"></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card__header">
+                    <h3>效益摘要</h3>
+                </div>
+                <div class="card__body">
+                    <div id="summaryStats"></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card__header">
+                    <h3>💰 投資報酬率 (ROI) 分析</h3>
+                </div>
+                <div class="card__body">
+                    <div style="background: var(--color-bg-2); padding: var(--space-12); border-radius: var(--radius-base); margin-bottom: var(--space-16); font-size: var(--font-size-sm);">
+                        <strong>👉 關鍵概念：</strong>收益來自加速採用，而非 TAM 擴張。提早獲得帳戶 = 更多季度的收入。
+                    </div>
+                    <div class="economics-inputs">
+                        <div class="form-group">
+                            <label class="form-label">平台開發成本 (USD)</label>
+                            <input type="number" class="form-control" id="devCost" value="1500000">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">年度維護成本 (USD)</label>
+                            <input type="number" class="form-control" id="maintCost" value="300000">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">每帳戶年度收益 (USD)</label>
+                            <input type="number" class="form-control" id="revenuePerAccount" value="25">
+                        </div>
+                        <div class="form-group" style="display: flex; align-items: flex-end;">
+                            <button class="btn btn--primary" id="calculateROIBtn" style="width: 100%;">計算 ROI</button>
+                        </div>
+                    </div>
+                    <div id="roiResults" style="display: none;">
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>情境</th>
+                                        <th>累計增量帳戶</th>
+                                        <th>加速收益</th>
+                                        <th>平台成本</th>
+                                        <th>淨效益</th>
+                                        <th>ROI</th>
+                                        <th>回本期</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="roiTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button class="btn btn--outline" id="backToStep3">返回配置</button>
+                <button class="btn btn--secondary" id="resetAllBtn">重新開始</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
