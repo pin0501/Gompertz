@@ -1347,7 +1347,6 @@ textarea.form-control {
   background: var(--color-secondary);
   outline: none;
   -webkit-appearance: none;
-  appearance: none;
 }
 
 .slider::-webkit-slider-thumb {
@@ -1814,56 +1813,4 @@ textarea.form-control {
 .legend-color.outlier {
   background: rgba(var(--color-error-rgb), 0.2);
   border: 2px solid var(--color-error);
-}
-
-/* Export message styles */
-.export-success {
-  color: var(--color-success);
-  background: rgba(var(--color-success-rgb), 0.1);
-  padding: var(--space-8) var(--space-12);
-  border-radius: var(--radius-base);
-  font-size: var(--font-size-sm);
-  border: 1px solid var(--color-success);
-}
-
-.export-error {
-  color: var(--color-error);
-  background: rgba(var(--color-error-rgb), 0.1);
-  padding: var(--space-8) var(--space-12);
-  border-radius: var(--radius-base);
-  font-size: var(--font-size-sm);
-  border: 1px solid var(--color-error);
-}
-
-/* Toast notification */
-.toast {
-  position: fixed;
-  top: var(--space-20);
-  right: var(--space-20);
-  padding: var(--space-12) var(--space-16);
-  background: var(--color-charcoal-700);
-  color: var(--color-cream-50);
-  border-radius: var(--radius-base);
-  box-shadow: var(--shadow-lg);
-  z-index: 9999;
-  animation: slideIn 0.3s ease-out;
-  font-size: var(--font-size-sm);
-}
-
-@keyframes slideIn {
-  from {
-    transform: translateX(400px);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-@media (prefers-color-scheme: dark) {
-  .toast {
-    background: var(--color-cream-100);
-    color: var(--color-charcoal-700);
-  }
 }

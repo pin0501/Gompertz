@@ -260,45 +260,6 @@
                 </div>
             </div>
 
-            <!-- Manual K Override -->
-            <div class="card" id="manualKCard" style="display: none;">
-                <div class="card__header">
-                    <h3>承載容量 (K) 設定</h3>
-                    <span class="tooltip" data-tip="K 代表市場的總可達市場規模 (TAM)">ⓘ</span>
-                </div>
-                <div class="card__body">
-                    <div style="background: var(--color-bg-2); padding: var(--space-12); border-radius: var(--radius-base); margin-bottom: var(--space-16); font-size: var(--font-size-sm);">
-                        <strong>💡 什麼是 K？</strong><br>
-                        K 代表您的市場總可達市場規模 (TAM - Total Addressable Market)。如果您有市場研究數據指出特定的 TAM，可以在此輸入。否則，使用自動擬合值。
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label">自動擬合的 K 值</label>
-                        <input type="text" class="form-control" id="autoFittedK" readonly style="background: var(--color-secondary);">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="radio-option" style="padding: var(--space-12); cursor: pointer;">
-                            <input type="checkbox" id="useCustomK" style="margin-right: var(--space-8);">
-                            <span style="font-weight: var(--font-weight-semibold);">使用自訂 K 值</span>
-                        </label>
-                    </div>
-                    
-                    <div id="customKSection" style="display: none;">
-                        <div class="form-group">
-                            <label class="form-label" for="customKValue">自訂 K 值</label>
-                            <input type="number" class="form-control" id="customKValue" placeholder="輸入自訂 K 值">
-                        </div>
-                        <div id="kWarning" style="display: none; margin-top: var(--space-8);"></div>
-                        <button class="btn btn--primary" id="applyCustomK">套用自訂 K</button>
-                    </div>
-                    
-                    <div id="currentKStatus" style="margin-top: var(--space-16); padding: var(--space-12); background: var(--color-bg-3); border-radius: var(--radius-base); font-weight: var(--font-weight-medium);">
-                        目前使用: <span id="currentKValue">-</span>
-                    </div>
-                </div>
-            </div>
-
             <div class="card">
                 <div class="card__header">
                     <h3>擬合結果可視化</h3>
@@ -319,51 +280,8 @@
         <!-- Step 3: Scenario Configuration -->
         <div class="section" id="step3" style="display: none;">
             <div class="section-header">
-                <h2>步驟 3: 平台加速參數配置</h2>
-                <p>配置平台對採用速度的加速效應（不改變市場容量 K）</p>
-            </div>
-
-            <!-- Key Insight Box -->
-            <div class="card" style="background: var(--color-bg-2); border: 2px solid var(--color-primary);">
-                <div class="card__header">
-                    <h3>⚡ 關鍵概念</h3>
-                </div>
-                <div class="card__body" style="font-size: var(--font-size-base);">
-                    <p style="margin-bottom: var(--space-12); font-weight: var(--font-weight-semibold);">平台的價值不在於擴大市場規模（K 保持固定），而在於加速採用速度。</p>
-                    <p style="margin-bottom: var(--space-12);">提早採用意味著：</p>
-                    <ul style="margin: 0 0 var(--space-12) var(--space-20); padding: 0;">
-                        <li style="margin-bottom: var(--space-8);">✓ 在高成長季度獲得更多收益</li>
-                        <li style="margin-bottom: var(--space-8);">✓ 更快回應競爭對手</li>
-                        <li style="margin-bottom: var(--space-8);">✓ 更多數據用於產品迭代</li>
-                        <li style="margin-bottom: var(--space-8);">✓ 網路效應更早啟動</li>
-                    </ul>
-                    <p style="background: var(--color-bg-3); padding: var(--space-12); border-radius: var(--radius-base); margin: 0;">
-                        <strong>這種時間優勢在 8 年期間價值數百萬。</strong>
-                    </p>
-                </div>
-            </div>
-
-            <!-- Model Details -->
-            <div class="card">
-                <div class="card__header">
-                    <h3>📐 數學模型</h3>
-                </div>
-                <div class="card__body">
-                    <div style="background: var(--color-surface); padding: var(--space-16); border-radius: var(--radius-base); border: 1px solid var(--color-border); font-family: var(--font-family-mono); font-size: var(--font-size-sm);">
-                        <strong>Gompertz 模型：</strong><br>
-                        N(t) = K × exp(-exp(-b(t)×(t-t₀)))<br><br>
-                        <strong>平台加速效應：</strong><br>
-                        b(t) = b₀ × [1 + α × exp(-ln(2)/H × (t-T))]  當 t ≥ T<br>
-                        b(t) = b₀  當 t &lt; T<br><br>
-                        <strong>參數說明：</strong><br>
-                        • K = 市場容量（固定，所有情境相同）<br>
-                        • b₀ = 基線成長速度<br>
-                        • t₀ = 轉折點<br>
-                        • α = 相對成長加速 (0.1 = 10%, 0.2 = 20%)<br>
-                        • H = 半衰期（季度）<br>
-                        • T = 平台啟動時間
-                    </div>
-                </div>
+                <h2>步驟 3: 介入情境配置</h2>
+                <p>配置不同情境的介入參數</p>
             </div>
 
             <div class="card">
@@ -379,33 +297,10 @@
 
                     <div class="form-group">
                         <label class="form-label" for="platformLaunch">
-                            平台啟動季度（Q1 2025 = 季度 1）
-                            <span class="tooltip" data-tip="平台在預測期的第幾季開始生效">ⓘ</span>
+                            平台啟動季度 (相對於預測起始)
+                            <span class="tooltip" data-tip="介入措施在預測期的第幾季開始">ⓘ</span>
                         </label>
-                        <input type="number" class="form-control" id="platformLaunch" value="3" min="1">
-                        <div style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-top: var(--space-4);">例如：3 = Q3 2025</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Parameter Guide -->
-            <div class="card" style="background: var(--color-bg-3);">
-                <div class="card__header">
-                    <h3>📊 參數選擇指南</h3>
-                </div>
-                <div class="card__body" style="font-size: var(--font-size-sm);">
-                    <div style="margin-bottom: var(--space-16);">
-                        <strong>α (成長加速率)：</strong><br>
-                        • 0-10%: 保守型，低風險估計<br>
-                        • 10-20%: 穩健型，現實估計<br>
-                        • 20-35%: 積極型，高影響情境<br>
-                        • &gt;35%: 不切實際 - 平台很少能使採用速度翻倍以上
-                    </div>
-                    <div>
-                        <strong>H (半衰期，季度)：</strong><br>
-                        • 4-6 季度: 平台影響快速減弱（短期熱潮）<br>
-                        • 6-10 季度: 持續提升（良好的產品市場契合度）<br>
-                        • 10+ 季度: 平台效應長期持續（強網路效應）
+                        <input type="number" class="form-control" id="platformLaunch" value="1" min="0">
                     </div>
                 </div>
             </div>
@@ -413,57 +308,108 @@
             <div class="scenarios-container">
                 <div class="scenario-card" data-scenario="conservative">
                     <h3>保守型情境</h3>
-                    <div style="background: var(--color-bg-1); padding: var(--space-12); border-radius: var(--radius-base); margin-bottom: var(--space-16); font-size: var(--font-size-sm);">
-                        輕微的平台提升效果，快速衰減
-                    </div>
                     <div class="param-sliders">
                         <div class="slider-group">
-                            <label>α (成長加速率): <span id="alpha_conservative_val">10</span>%</label>
-                            <input type="range" class="slider" id="alpha_conservative" min="0" max="50" step="1" value="10">
-                            <div class="param-description">採用速度在平台影響期提升 10%</div>
+                            <label>α (成長加速): <span id="alpha_conservative_val">0.10</span></label>
+                            <input type="range" class="slider" id="alpha_conservative" min="0" max="0.5" step="0.01" value="0.10">
+                            <div class="param-description">成長速度提升幅度</div>
                         </div>
                         <div class="slider-group">
-                            <label>H (半衰期): <span id="half_life_conservative_val">6</span> 季度</label>
+                            <label>Δt (轉折點位移): <span id="delta_t_conservative_val">0.5</span></label>
+                            <input type="range" class="slider" id="delta_t_conservative" min="0" max="3" step="0.1" value="0.5">
+                            <div class="param-description">轉折點提前的季數</div>
+                        </div>
+                        <div class="slider-group">
+                            <label>κ (容量擴張): <span id="kappa_conservative_val">0.02</span></label>
+                            <input type="range" class="slider" id="kappa_conservative" min="0" max="0.15" step="0.01" value="0.02">
+                            <div class="param-description">市場容量擴張比例</div>
+                        </div>
+                        <div class="slider-group">
+                            <label>H (加速半衰期): <span id="half_life_conservative_val">6</span> 季</label>
                             <input type="range" class="slider" id="half_life_conservative" min="2" max="16" step="1" value="6">
-                            <div class="param-description">加速效應在 6 季度後減半</div>
+                            <div class="param-description">加速效應持續時間</div>
+                        </div>
+                        <div class="slider-group">
+                            <label>W (介入窗口): <span id="window_conservative_val">6</span> 季</label>
+                            <input type="range" class="slider" id="window_conservative" min="4" max="16" step="1" value="6">
+                            <div class="param-description">介入措施持續時間</div>
+                        </div>
+                        <div class="slider-group">
+                            <label>E (擴張窗口): <span id="expansion_conservative_val">8</span> 季</label>
+                            <input type="range" class="slider" id="expansion_conservative" min="4" max="16" step="1" value="8">
+                            <div class="param-description">容量擴張持續時間</div>
                         </div>
                     </div>
                 </div>
 
                 <div class="scenario-card" data-scenario="moderate">
                     <h3>穩健型情境</h3>
-                    <div style="background: var(--color-bg-3); padding: var(--space-12); border-radius: var(--radius-base); margin-bottom: var(--space-16); font-size: var(--font-size-sm);">
-                        平衡的提升效果，中等持續性
-                    </div>
                     <div class="param-sliders">
                         <div class="slider-group">
-                            <label>α (成長加速率): <span id="alpha_moderate_val">20</span>%</label>
-                            <input type="range" class="slider" id="alpha_moderate" min="0" max="50" step="1" value="20">
-                            <div class="param-description">採用速度在平台影響期提升 20%</div>
+                            <label>α (成長加速): <span id="alpha_moderate_val">0.20</span></label>
+                            <input type="range" class="slider" id="alpha_moderate" min="0" max="0.5" step="0.01" value="0.20">
+                            <div class="param-description">成長速度提升幅度</div>
                         </div>
                         <div class="slider-group">
-                            <label>H (半衰期): <span id="half_life_moderate_val">8</span> 季度</label>
+                            <label>Δt (轉折點位移): <span id="delta_t_moderate_val">1.0</span></label>
+                            <input type="range" class="slider" id="delta_t_moderate" min="0" max="3" step="0.1" value="1.0">
+                            <div class="param-description">轉折點提前的季數</div>
+                        </div>
+                        <div class="slider-group">
+                            <label>κ (容量擴張): <span id="kappa_moderate_val">0.05</span></label>
+                            <input type="range" class="slider" id="kappa_moderate" min="0" max="0.15" step="0.01" value="0.05">
+                            <div class="param-description">市場容量擴張比例</div>
+                        </div>
+                        <div class="slider-group">
+                            <label>H (加速半衰期): <span id="half_life_moderate_val">8</span> 季</label>
                             <input type="range" class="slider" id="half_life_moderate" min="2" max="16" step="1" value="8">
-                            <div class="param-description">加速效應在 8 季度（2年）後減半</div>
+                            <div class="param-description">加速效應持續時間</div>
+                        </div>
+                        <div class="slider-group">
+                            <label>W (介入窗口): <span id="window_moderate_val">8</span> 季</label>
+                            <input type="range" class="slider" id="window_moderate" min="4" max="16" step="1" value="8">
+                            <div class="param-description">介入措施持續時間</div>
+                        </div>
+                        <div class="slider-group">
+                            <label>E (擴張窗口): <span id="expansion_moderate_val">10</span> 季</label>
+                            <input type="range" class="slider" id="expansion_moderate" min="4" max="16" step="1" value="10">
+                            <div class="param-description">容量擴張持續時間</div>
                         </div>
                     </div>
                 </div>
 
                 <div class="scenario-card" data-scenario="aggressive">
                     <h3>積極型情境</h3>
-                    <div style="background: var(--color-bg-4); padding: var(--space-12); border-radius: var(--radius-base); margin-bottom: var(--space-16); font-size: var(--font-size-sm);">
-                        強勁的平台提升，持續時間更長
-                    </div>
                     <div class="param-sliders">
                         <div class="slider-group">
-                            <label>α (成長加速率): <span id="alpha_aggressive_val">35</span>%</label>
-                            <input type="range" class="slider" id="alpha_aggressive" min="0" max="50" step="1" value="35">
-                            <div class="param-description">採用速度在平台影響期提升 35%</div>
+                            <label>α (成長加速): <span id="alpha_aggressive_val">0.35</span></label>
+                            <input type="range" class="slider" id="alpha_aggressive" min="0" max="0.5" step="0.01" value="0.35">
+                            <div class="param-description">成長速度提升幅度</div>
                         </div>
                         <div class="slider-group">
-                            <label>H (半衰期): <span id="half_life_aggressive_val">10</span> 季度</label>
+                            <label>Δt (轉折點位移): <span id="delta_t_aggressive_val">1.5</span></label>
+                            <input type="range" class="slider" id="delta_t_aggressive" min="0" max="3" step="0.1" value="1.5">
+                            <div class="param-description">轉折點提前的季數</div>
+                        </div>
+                        <div class="slider-group">
+                            <label>κ (容量擴張): <span id="kappa_aggressive_val">0.08</span></label>
+                            <input type="range" class="slider" id="kappa_aggressive" min="0" max="0.15" step="0.01" value="0.08">
+                            <div class="param-description">市場容量擴張比例</div>
+                        </div>
+                        <div class="slider-group">
+                            <label>H (加速半衰期): <span id="half_life_aggressive_val">10</span> 季</label>
                             <input type="range" class="slider" id="half_life_aggressive" min="2" max="16" step="1" value="10">
-                            <div class="param-description">加速效應在 10 季度後減半</div>
+                            <div class="param-description">加速效應持續時間</div>
+                        </div>
+                        <div class="slider-group">
+                            <label>W (介入窗口): <span id="window_aggressive_val">12</span> 季</label>
+                            <input type="range" class="slider" id="window_aggressive" min="4" max="16" step="1" value="12">
+                            <div class="param-description">介入措施持續時間</div>
+                        </div>
+                        <div class="slider-group">
+                            <label>E (擴張窗口): <span id="expansion_aggressive_val">12</span> 季</label>
+                            <input type="range" class="slider" id="expansion_aggressive" min="4" max="16" step="1" value="12">
+                            <div class="param-description">容量擴張持續時間</div>
                         </div>
                     </div>
                 </div>
@@ -485,61 +431,27 @@
             <div class="card">
                 <div class="card__header">
                     <h3>預測趨勢圖</h3>
+                    <div class="chart-controls">
+                        <button class="btn btn--sm btn--outline" id="exportChartBtn">匯出圖表</button>
+                    </div>
                 </div>
                 <div class="card__body">
                     <div class="chart-container">
                         <canvas id="forecastChart"></canvas>
                     </div>
-                    
-                    <div class="chart-controls" style="margin-top: var(--space-16); display: flex; gap: var(--space-8); flex-wrap: wrap;">
-                        <button class="btn btn--sm btn--outline" id="exportPNG">下載 PNG</button>
-                        <button class="btn btn--sm btn--outline" id="exportSVG">下載 SVG</button>
-                        <button class="btn btn--sm btn--outline" id="exportPDF">下載 PDF</button>
-                    </div>
-                    
-                    <div id="exportMessage" style="display: none; margin-top: var(--space-12);"></div>
                 </div>
             </div>
-            
-            <!-- Explanation Box -->
-            <div class="card" style="background: var(--color-bg-2); border: 2px solid var(--color-primary);">
-                <div class="card__header">
-                    <h3>📊 如何閱讀此圖表</h3>
-                </div>
-                <div class="card__body" style="font-size: var(--font-size-sm);">
-                    <p style="margin-bottom: var(--space-12);">• 所有線條收斂到相同點（K ≈ <span id="explainK" style="font-weight: var(--font-weight-semibold);">-</span>）因為這是市場上限</p>
-                    <p style="margin-bottom: var(--space-12);">• 平台不會改變市場規模 - 它加速採用速度</p>
-                    <p style="margin-bottom: var(--space-12);">• <strong>真正的效益：</strong>穩健型情境提前約 <span id="timingSaved" style="font-weight: var(--font-weight-semibold); color: var(--color-success);">-</span> 季度達到高滲透率</p>
-                    <p style="background: var(--color-bg-3); padding: var(--space-12); border-radius: var(--radius-base); margin: 0;">
-                        <strong>💰 這種時間差異很有價值：</strong>提前 12 個月達到高滲透市場 = 額外 12 個月的收入
-                    </p>
-                </div>
-            </div>
-            
-            <!-- Summary Table -->
+
             <div class="card">
                 <div class="card__header">
-                    <h3>關鍵數據摘要</h3>
+                    <h3>增量帳戶分析</h3>
                 </div>
                 <div class="card__body">
-                    <div class="table-container">
-                        <table class="data-table" id="summaryComparisonTable">
-                            <thead>
-                                <tr>
-                                    <th>時間點</th>
-                                    <th>基線</th>
-                                    <th>保守型</th>
-                                    <th>穩健型</th>
-                                    <th>積極型</th>
-                                </tr>
-                            </thead>
-                            <tbody></tbody>
-                        </table>
+                    <div class="chart-container">
+                        <canvas id="incrementalChart"></canvas>
                     </div>
                 </div>
             </div>
-
-
 
             <div class="card">
                 <div class="card__header">
@@ -569,16 +481,6 @@
                 </div>
             </div>
 
-            <!-- Timing Milestones -->
-            <div class="card" style="background: var(--color-bg-3);">
-                <div class="card__header">
-                    <h3>⏱️ 時間優勢分析</h3>
-                </div>
-                <div class="card__body">
-                    <div id="timingMilestones"></div>
-                </div>
-            </div>
-
             <div class="card">
                 <div class="card__header">
                     <h3>效益摘要</h3>
@@ -590,12 +492,9 @@
 
             <div class="card">
                 <div class="card__header">
-                    <h3>💰 投資報酬率 (ROI) 分析</h3>
+                    <h3>ROI 經濟分析</h3>
                 </div>
                 <div class="card__body">
-                    <div style="background: var(--color-bg-2); padding: var(--space-12); border-radius: var(--radius-base); margin-bottom: var(--space-16); font-size: var(--font-size-sm);">
-                        <strong>👉 關鍵概念：</strong>收益來自加速採用，而非 TAM 擴張。提早獲得帳戶 = 更多季度的收入。
-                    </div>
                     <div class="economics-inputs">
                         <div class="form-group">
                             <label class="form-label">平台開發成本 (USD)</label>
@@ -606,12 +505,14 @@
                             <input type="number" class="form-control" id="maintCost" value="300000">
                         </div>
                         <div class="form-group">
+                            <label class="form-label">每帳戶獲客成本 (USD)</label>
+                            <input type="number" class="form-control" id="acquisitionCost" value="50">
+                        </div>
+                        <div class="form-group">
                             <label class="form-label">每帳戶年度收益 (USD)</label>
                             <input type="number" class="form-control" id="revenuePerAccount" value="25">
                         </div>
-                        <div class="form-group" style="display: flex; align-items: flex-end;">
-                            <button class="btn btn--primary" id="calculateROIBtn" style="width: 100%;">計算 ROI</button>
-                        </div>
+                        <button class="btn btn--primary" id="calculateROIBtn">計算 ROI</button>
                     </div>
                     <div id="roiResults" style="display: none;">
                         <div class="table-container">
@@ -619,12 +520,12 @@
                                 <thead>
                                     <tr>
                                         <th>情境</th>
-                                        <th>累計增量帳戶</th>
-                                        <th>加速收益</th>
+                                        <th>增量收益</th>
+                                        <th>獲客成本</th>
                                         <th>平台成本</th>
                                         <th>淨效益</th>
-                                        <th>ROI</th>
-                                        <th>回本期</th>
+                                        <th>ROI %</th>
+                                        <th>回本期 (年)</th>
                                     </tr>
                                 </thead>
                                 <tbody id="roiTableBody"></tbody>

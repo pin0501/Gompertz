@@ -10,39 +10,20 @@ const state = {
   historicalData: [],
   dataQuality: null,
   fittedParams: null,
-  autoFittedK: null,
-  useCustomK: false,
-  customK: null,
-  currentK: null,
   forecastData: null,
   scenarios: ['conservative', 'moderate', 'aggressive'],
   scenarioParams: {
-    conservative: { alpha: 0.10, half_life: 6 },
-    moderate: { alpha: 0.20, half_life: 8 },
-    aggressive: { alpha: 0.35, half_life: 10 }
+    conservative: { alpha: 0.10, delta_t: 0.5, kappa: 0.02, half_life: 6, window_length: 6, expansion_length: 8 },
+    moderate: { alpha: 0.20, delta_t: 1.0, kappa: 0.05, half_life: 8, window_length: 8, expansion_length: 10 },
+    aggressive: { alpha: 0.35, delta_t: 1.5, kappa: 0.08, half_life: 10, window_length: 12, expansion_length: 12 }
   },
   platformLaunchQuarter: 1,
-  interpolationMethod: 'ignore',
-  currentChartView: 'absolute'
+  interpolationMethod: 'ignore'
 };
 
 let fittingChart = null;
 let forecastChart = null;
 let incrementalChart = null;
-
-// Toast notification helper
-function showToast(message, duration = 3000) {
-  const toast = document.createElement('div');
-  toast.className = 'toast';
-  toast.textContent = message;
-  document.body.appendChild(toast);
-  
-  setTimeout(() => {
-    toast.style.opacity = '0';
-    toast.style.transition = 'opacity 0.3s';
-    setTimeout(() => toast.remove(), 300);
-  }, duration);
-}
 
 // Utility functions
 function formatNumber(num) {
@@ -299,7 +280,7 @@ function applyIntervention(t, baselineValue, params, interventionParams, launchQ
   }
   
   const { K, b, t0 } = params;
-  const { alpha, half_life } = interventionParams;
+  const { alpha, delta_t, kappa, half_life, window_length, expansion_length } = interventionParams;
   
   // Validate parameters
   if (!isFinite(K) || !isFinite(b) || !isFinite(t0)) {
@@ -314,37 +295,63 @@ function applyIntervention(t, baselineValue, params, interventionParams, launchQ
   const tSinceLaunch = t - launchQuarter;
   
   // Growth acceleration with exponential decay (with safety bounds)
-  // b(t) = b0 * [1 + alpha * exp(-ln(2)/H * (t-T))]
-  const decayExponent = -Math.log(2) * tSinceLaunch / half_life;
-  // Clamp decay exponent
-  const clampedExp = Math.max(-100, Math.min(0, decayExponent));
-  const decayFactor = Math.exp(clampedExp);
+  let accelerationFactor = 1;
+  if (tSinceLaunch < window_length) {
+    const decayExponent = -Math.log(2) * tSinceLaunch / half_life;
+    // Clamp decay exponent
+    const clampedExp = Math.max(-100, Math.min(0, decayExponent));
+    const decayFactor = Math.exp(clampedExp);
+    
+    if (!isFinite(decayFactor)) {
+      console.warn('Invalid decay factor at t=' + t);
+      accelerationFactor = 1;
+    } else {
+      // Cap alpha effect
+      const cappedAlpha = Math.min(0.5, Math.max(0, alpha));
+      accelerationFactor = 1 + cappedAlpha * decayFactor;
+    }
+  }
   
-  if (!isFinite(decayFactor)) {
-    console.warn('Invalid decay factor at t=' + t);
+  // TAM expansion with smooth transition (with safety bounds)
+  let capacityFactor = 1;
+  if (tSinceLaunch < expansion_length) {
+    const expansionProgress = tSinceLaunch / expansion_length;
+    const expansionExp = -3 * expansionProgress;
+    // Clamp expansion exponent
+    const clampedExpansion = Math.max(-100, Math.min(0, expansionExp));
+    const expansionSmoother = 1 - Math.exp(clampedExpansion);
+    
+    if (!isFinite(expansionSmoother)) {
+      console.warn('Invalid expansion smoother at t=' + t);
+      capacityFactor = 1;
+    } else {
+      // Cap kappa effect
+      const cappedKappa = Math.min(0.2, Math.max(0, kappa));
+      capacityFactor = 1 + cappedKappa * expansionSmoother;
+    }
+  } else {
+    const cappedKappa = Math.min(0.2, Math.max(0, kappa));
+    capacityFactor = 1 + cappedKappa;
+  }
+  
+  // Validate factors
+  if (!isFinite(accelerationFactor) || !isFinite(capacityFactor)) {
+    console.warn('Invalid factors:', { accelerationFactor, capacityFactor });
     return baselineValue;
   }
   
-  // Cap alpha effect to 0-50% range
-  const cappedAlpha = Math.min(0.5, Math.max(0, alpha));
-  const accelerationFactor = 1 + cappedAlpha * decayFactor;
+  // Apply intervention with bounds
+  const adjustedK = K * capacityFactor;
+  const adjustedB = b * Math.min(2.0, accelerationFactor); // Cap acceleration
+  const adjustedT0 = t0 - Math.min(5, Math.max(0, delta_t)); // Cap shift
   
-  // Validate factor
-  if (!isFinite(accelerationFactor)) {
-    console.warn('Invalid acceleration factor:', { accelerationFactor });
+  // Validate adjusted parameters
+  if (!isFinite(adjustedK) || !isFinite(adjustedB) || !isFinite(adjustedT0)) {
+    console.warn('Invalid adjusted params:', { adjustedK, adjustedB, adjustedT0 });
     return baselineValue;
   }
   
-  // Apply intervention: ONLY adjust b, keep K and t0 fixed
-  const adjustedB = b * accelerationFactor;
-  
-  // Validate adjusted parameter
-  if (!isFinite(adjustedB) || adjustedB <= 0) {
-    console.warn('Invalid adjusted b:', { adjustedB });
-    return baselineValue;
-  }
-  
-  const result = gompertzModel(t, K, adjustedB, t0);
+  const result = gompertzModel(t, adjustedK, adjustedB, adjustedT0);
   
   // Return baseline if result is invalid
   if (!isFinite(result)) {
@@ -688,36 +695,8 @@ function displayDataPreview(data) {
       <td>${statusBadge}</td>
       <td>${outlierBadge}</td>
       <td style="font-size: var(--font-size-sm);">${recommendation}</td>
-      <td class="cell-actions"></td> 
+      <td class="cell-actions">${actions}</td>
     `;
-
-    // --- 這是修改的部分 ---
-    const actionsCell = tr.querySelector('.cell-actions');
-
-    if (row.isMissing) {
-      const editBtn = document.createElement('button');
-      editBtn.className = 'btn btn--sm btn--outline';
-      editBtn.textContent = '手動輸入';
-      // 使用 addEventListener，這是 CSP 安全的
-      editBtn.addEventListener('click', () => editCell(index));
-      actionsCell.appendChild(editBtn);
-    } else if (row.dataType === 'Interpolated') {
-      const modifyBtn = document.createElement('button');
-      modifyBtn.className = 'btn btn--sm btn--outline';
-      modifyBtn.textContent = '修改';
-      modifyBtn.addEventListener('click', () => editCell(index));
-      actionsCell.appendChild(modifyBtn);
-    } else if (row.isOutlier) {
-      const confirmBtn = document.createElement('button');
-      confirmBtn.className = 'btn btn--sm btn--outline';
-      confirmBtn.textContent = '確認無誤';
-      confirmBtn.addEventListener('click', () => confirmCell(index));
-      actionsCell.appendChild(confirmBtn);
-    } else {
-      actionsCell.textContent = '-';
-    }
-    // --- 修改結束 ---
-
     tbody.appendChild(tr);
   });
   
@@ -805,8 +784,6 @@ function performFitting() {
     }
     
     state.fittedParams = result.params;
-    state.autoFittedK = result.params.K;
-    state.currentK = result.params.K;
     
     // Validate and display parameters with status indicators
     const paramKEl = document.getElementById('paramK');
@@ -896,71 +873,8 @@ function performFitting() {
     statusEl.style.display = 'block';
     paramsEl.style.display = 'block';
     
-    // Show manual K card
-    displayManualKSection();
-    
     displayFittingChart();
   }, 500);
-}
-
-// Manual K Section
-function displayManualKSection() {
-  const card = document.getElementById('manualKCard');
-  const autoFittedKInput = document.getElementById('autoFittedK');
-  const currentKStatus = document.getElementById('currentKValue');
-  
-  autoFittedKInput.value = formatNumber(state.autoFittedK);
-  currentKStatus.textContent = `自動擬合 K = ${formatNumber(state.currentK)} ✓`;
-  
-  card.style.display = 'block';
-}
-
-function applyCustomK() {
-  const customKValue = parseFloat(document.getElementById('customKValue').value);
-  const maxData = Math.max(...state.historicalData.filter(d => !d.isMissing).map(d => d.accounts));
-  const warningDiv = document.getElementById('kWarning');
-  
-  if (!customKValue || !isFinite(customKValue)) {
-    warningDiv.innerHTML = '<div class="export-error">⚠️ 請輸入有效的數字</div>';
-    warningDiv.style.display = 'block';
-    return;
-  }
-  
-  if (customKValue < 0) {
-    warningDiv.innerHTML = '<div class="export-error">⚠️ K 值必須為正數</div>';
-    warningDiv.style.display = 'block';
-    return;
-  }
-  
-  // Show warnings
-  if (customKValue < maxData * 1.05) {
-    warningDiv.innerHTML = '<div class="export-error">⚠️ 警告: K 值低於最大觀測值。這會導致模型無法擬合數據。</div>';
-    warningDiv.style.display = 'block';
-    return;
-  } else if (customKValue > maxData * 5) {
-    warningDiv.innerHTML = '<div style="color: var(--color-warning); background: rgba(var(--color-warning-rgb), 0.1); padding: var(--space-8) var(--space-12); border-radius: var(--radius-base); font-size: var(--font-size-sm); border: 1px solid var(--color-warning);">⚠️ 警告: K 值非常高，可能導致不穩定。建議值: ' + formatNumber(maxData * 1.2) + ' - ' + formatNumber(maxData * 3) + '</div>';
-    warningDiv.style.display = 'block';
-  } else {
-    warningDiv.style.display = 'none';
-  }
-  
-  state.customK = customKValue;
-  state.currentK = customKValue;
-  state.useCustomK = true;
-  
-  // Update fitted params with new K
-  state.fittedParams.K = customKValue;
-  
-  // Update display
-  document.getElementById('paramK').innerHTML = '✔ ' + formatNumber(customKValue) + ' <span style="font-size: var(--font-size-xs); color: var(--color-primary);">(自訂)</span>';
-  document.getElementById('currentKValue').textContent = `自訂 K = ${formatNumber(customKValue)} ✓`;
-  document.getElementById('currentKStatus').style.background = 'rgba(var(--color-primary-rgb), 0.1)';
-  document.getElementById('currentKStatus').style.border = '1px solid var(--color-primary)';
-  
-  // Refit curve with new K
-  displayFittingChart();
-  
-  showToast('✓ 已套用自訂 K 值');
 }
 
 function displayFittingChart() {
@@ -1034,7 +948,7 @@ function displayFittingChart() {
 // Step 3: Scenario Configuration
 function initializeSliders() {
   const scenarios = ['conservative', 'moderate', 'aggressive'];
-  const params = ['alpha', 'half_life'];
+  const params = ['alpha', 'delta_t', 'kappa', 'half_life', 'window', 'expansion'];
   
   scenarios.forEach(scenario => {
     params.forEach(param => {
@@ -1044,28 +958,12 @@ function initializeSliders() {
       
       if (slider && valueEl) {
         slider.addEventListener('input', (e) => {
-          let value = parseFloat(e.target.value);
-          
-          // For alpha, convert from percentage (0-50) to decimal (0-0.5)
-          if (param === 'alpha') {
-            valueEl.textContent = value;
-            value = value / 100; // Convert to decimal
-            
-            // Show warning if alpha > 35%
-            if (value > 0.35) {
-              showToast('⚠️ 警告: 成長加速 >35% 可能不切實際', 2000);
-            }
-          } else {
-            valueEl.textContent = value;
-            
-            // Show warning if half_life < 4
-            if (param === 'half_life' && value < 4) {
-              showToast('⚠️ 警告: 半衰期 <4 季度效果會快速減弱', 2000);
-            }
-          }
+          const value = parseFloat(e.target.value);
+          valueEl.textContent = value;
           
           // Update state
-          state.scenarioParams[scenario][param] = value;
+          const paramKey = param === 'window' ? 'window_length' : param === 'expansion' ? 'expansion_length' : param;
+          state.scenarioParams[scenario][paramKey] = value;
         });
       }
     });
@@ -1074,43 +972,41 @@ function initializeSliders() {
 
 function loadScenarioPreset(scenario) {
   const presets = {
-    conservative: { alpha: 0.10, half_life: 6 },
-    moderate: { alpha: 0.20, half_life: 8 },
-    aggressive: { alpha: 0.35, half_life: 10 }
+    conservative: { alpha: 0.10, delta_t: 0.5, kappa: 0.02, half_life: 6, window_length: 6, expansion_length: 8 },
+    moderate: { alpha: 0.20, delta_t: 1.0, kappa: 0.05, half_life: 8, window_length: 8, expansion_length: 10 },
+    aggressive: { alpha: 0.35, delta_t: 1.5, kappa: 0.08, half_life: 10, window_length: 12, expansion_length: 12 }
   };
   
   const preset = presets[scenario];
   state.scenarioParams[scenario] = { ...preset };
   
-  // Update sliders (alpha is in percentage on slider)
-  document.getElementById(`alpha_${scenario}`).value = preset.alpha * 100;
-  document.getElementById(`alpha_${scenario}_val`).textContent = (preset.alpha * 100);
+  // Update sliders
+  document.getElementById(`alpha_${scenario}`).value = preset.alpha;
+  document.getElementById(`alpha_${scenario}_val`).textContent = preset.alpha;
+  
+  document.getElementById(`delta_t_${scenario}`).value = preset.delta_t;
+  document.getElementById(`delta_t_${scenario}_val`).textContent = preset.delta_t;
+  
+  document.getElementById(`kappa_${scenario}`).value = preset.kappa;
+  document.getElementById(`kappa_${scenario}_val`).textContent = preset.kappa;
   
   document.getElementById(`half_life_${scenario}`).value = preset.half_life;
   document.getElementById(`half_life_${scenario}_val`).textContent = preset.half_life;
   
-  showToast(`✓ 已載入${scenario === 'conservative' ? '保守型' : scenario === 'moderate' ? '穩健型' : '積極型'}情境預設`);
+  document.getElementById(`window_${scenario}`).value = preset.window_length;
+  document.getElementById(`window_${scenario}_val`).textContent = preset.window_length;
+  
+  document.getElementById(`expansion_${scenario}`).value = preset.expansion_length;
+  document.getElementById(`expansion_${scenario}_val`).textContent = preset.expansion_length;
 }
 
 // Step 4: Results & Analysis
 function generateForecasts() {
   const forecastYears = parseInt(document.getElementById('forecastYears').value);
   const forecastQuarters = forecastYears * 4;
-  let platformLaunch = parseInt(document.getElementById('platformLaunch').value);
-  
-  // Default to quarter 3 if invalid
-  if (!platformLaunch || platformLaunch < 1) {
-    platformLaunch = 3;
-    document.getElementById('platformLaunch').value = 3;
-  }
+  const platformLaunch = parseInt(document.getElementById('platformLaunch').value);
   
   state.platformLaunchQuarter = platformLaunch;
-  
-  // Validate platform launch is reasonable
-  if (platformLaunch < 1) {
-    alert('⚠️ 平台啟動季度不能小於 1');
-    return;
-  }
   
   console.log('Generating forecasts for', forecastQuarters, 'quarters...');
   console.log('Platform launch at quarter:', platformLaunch);
@@ -1182,33 +1078,26 @@ function generateForecasts() {
   
   goToStep(4);
   displayForecastChart();
+  displayIncrementalChart();
   displayForecastTable();
-  displayTimingMilestones();
   displaySummaryStats();
-  updateSummaryComparisonTable();
-  updateExplanationBox();
 }
 
 function displayForecastChart() {
-  // Always use single unified chart view
-  displayUnifiedForecastChart();
-}
-
-function displayUnifiedForecastChart() {
   const ctx = document.getElementById('forecastChart').getContext('2d');
   
   if (forecastChart) {
     forecastChart.destroy();
   }
   
+  // Filter out NaN values for charting
   const filterNaN = (arr) => arr.map(v => isFinite(v) ? v : null);
   
-  // Single unified view showing all scenarios
-  let chartData, chartOptions;
+  const launchIndex = state.platformLaunchQuarter - 1;
   
-  {
-    // Absolute accounts view
-    chartData = {
+  forecastChart = new Chart(ctx, {
+    type: 'line',
+    data: {
       labels: state.forecastData.periods,
       datasets: [
         {
@@ -1216,7 +1105,7 @@ function displayUnifiedForecastChart() {
           data: filterNaN(state.forecastData.baseline),
           borderColor: '#6b7280',
           backgroundColor: 'transparent',
-          borderWidth: 3,
+          borderWidth: 2,
           pointRadius: 0,
           spanGaps: false
         },
@@ -1226,7 +1115,6 @@ function displayUnifiedForecastChart() {
           borderColor: '#3b82f6',
           backgroundColor: 'transparent',
           borderWidth: 2,
-          borderDash: [5, 3],
           pointRadius: 0,
           spanGaps: false
         },
@@ -1236,7 +1124,6 @@ function displayUnifiedForecastChart() {
           borderColor: '#10b981',
           backgroundColor: 'transparent',
           borderWidth: 2,
-          borderDash: [5, 3],
           pointRadius: 0,
           spanGaps: false
         },
@@ -1246,23 +1133,26 @@ function displayUnifiedForecastChart() {
           borderColor: '#ef4444',
           backgroundColor: 'transparent',
           borderWidth: 2,
-          borderDash: [5, 3],
           pointRadius: 0,
           spanGaps: false
         }
       ]
-    };
-    
-    chartOptions = {
+    },
+    options: {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { display: true, position: 'top' },
+        legend: {
+          display: true,
+          position: 'top'
+        },
         tooltip: {
           callbacks: {
             label: function(context) {
               const value = context.parsed.y;
-              if (value === null || !isFinite(value)) return context.dataset.label + ': N/A';
+              if (value === null || !isFinite(value)) {
+                return context.dataset.label + ': N/A';
+              }
               return context.dataset.label + ': ' + formatNumber(value);
             }
           }
@@ -1271,184 +1161,16 @@ function displayUnifiedForecastChart() {
       scales: {
         y: {
           beginAtZero: false,
-          grid: { display: true, color: 'rgba(0,0,0,0.05)' },
-          ticks: { callback: function(value) { return formatNumber(value); } }
-        },
-        x: { grid: { display: false } }
+          ticks: {
+            callback: function(value) {
+              return formatNumber(value);
+            }
+          }
+        }
       }
-    };
-  
-  forecastChart = new Chart(ctx, {
-    type: 'line',
-    data: chartData,
-    options: chartOptions
-  });
-  
-  // Add note about convergence
-  const chartContainer = ctx.canvas.parentElement;
-  let noteDiv = chartContainer.querySelector('.chart-note');
-  if (!noteDiv) {
-    noteDiv = document.createElement('div');
-    noteDiv.className = 'chart-note';
-    noteDiv.style.cssText = 'margin-top: var(--space-8); font-size: var(--font-size-xs); color: var(--color-text-secondary); text-align: center;';
-    chartContainer.appendChild(noteDiv);
-  }
-  noteDiv.innerHTML = '📌 注意：所有線條收斂到相同的 K ≈ ' + formatNumber(state.currentK) + '，因為平台不改變市場容量，只加速採用。';
-}
-
-function displayTimingMilestones() {
-  const div = document.getElementById('timingMilestones');
-  const K = state.currentK;
-  const n = state.forecastData.periods.length;
-  
-  // Find when each scenario reaches different penetration levels
-  const milestones = [
-    { level: 0.90, label: '90%' },
-    { level: 0.95, label: '95%' },
-    { level: 0.98, label: '98%' }
-  ];
-  
-  let html = '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--space-16);">';
-  
-  milestones.forEach(milestone => {
-    const target = K * milestone.level;
-    
-    let baselineReach = -1, conservativeReach = -1, moderateReach = -1, aggressiveReach = -1;
-    
-    for (let i = 0; i < n; i++) {
-      if (baselineReach === -1 && state.forecastData.baseline[i] >= target) baselineReach = i;
-      if (conservativeReach === -1 && state.forecastData.conservative[i] >= target) conservativeReach = i;
-      if (moderateReach === -1 && state.forecastData.moderate[i] >= target) moderateReach = i;
-      if (aggressiveReach === -1 && state.forecastData.aggressive[i] >= target) aggressiveReach = i;
     }
-    
-    const baselineQuarters = baselineReach >= 0 ? baselineReach : 'N/A';
-    const conservativeSaved = baselineReach >= 0 && conservativeReach >= 0 ? baselineReach - conservativeReach : 0;
-    const moderateSaved = baselineReach >= 0 && moderateReach >= 0 ? baselineReach - moderateReach : 0;
-    const aggressiveSaved = baselineReach >= 0 && aggressiveReach >= 0 ? baselineReach - aggressiveReach : 0;
-    
-    html += `
-      <div style="background: var(--color-surface); padding: var(--space-16); border-radius: var(--radius-base); border: 1px solid var(--color-border);">
-        <h4 style="margin-bottom: var(--space-12); font-size: var(--font-size-lg);">達到 ${milestone.label} 滲透 (${formatNumber(target)})</h4>
-        <div style="font-size: var(--font-size-sm);">
-          <div style="margin-bottom: var(--space-8);">
-            <strong>基線：</strong> ${baselineReach >= 0 ? state.forecastData.periods[baselineReach] : '未達到'}
-          </div>
-          <div style="margin-bottom: var(--space-8); color: #3b82f6;">
-            <strong>保守型：</strong> ${conservativeReach >= 0 ? state.forecastData.periods[conservativeReach] : '未達到'}
-            ${conservativeSaved > 0 ? '<span style="color: var(--color-success);"> (↑ 提前 ' + conservativeSaved + ' 季度)</span>' : ''}
-          </div>
-          <div style="margin-bottom: var(--space-8); color: #10b981;">
-            <strong>穩健型：</strong> ${moderateReach >= 0 ? state.forecastData.periods[moderateReach] : '未達到'}
-            ${moderateSaved > 0 ? '<span style="color: var(--color-success); font-weight: var(--font-weight-semibold);"> (↑ 提前 ' + moderateSaved + ' 季度)</span>' : ''}
-          </div>
-          <div style="color: #ef4444;">
-            <strong>積極型：</strong> ${aggressiveReach >= 0 ? state.forecastData.periods[aggressiveReach] : '未達到'}
-            ${aggressiveSaved > 0 ? '<span style="color: var(--color-success);"> (↑ 提前 ' + aggressiveSaved + ' 季度)</span>' : ''}
-          </div>
-        </div>
-      </div>
-    `;
-  });
-  
-  html += '</div>';
-  
-  html += `
-    <div style="margin-top: var(--space-16); padding: var(--space-12); background: var(--color-bg-2); border-radius: var(--radius-base); font-size: var(--font-size-sm);">
-      <strong>💡 時間價值：</strong>提前 4-8 季度達到高滲透率意味著在1-2 年期間的額外收入、
-      更快的市場主導地位、以及更早啟動的網路效應。
-    </div>
-  `;
-  
-  div.innerHTML = html;
-}
-
-function updateExplanationBox() {
-  const K = state.currentK;
-  document.getElementById('explainK').textContent = formatNumber(K);
-  
-  // Calculate timing saved (rough estimate)
-  const n = state.forecastData.periods.length;
-  const target95 = K * 0.95;
-  
-  let baselineReach = -1, moderateReach = -1;
-  for (let i = 0; i < n; i++) {
-    if (baselineReach === -1 && state.forecastData.baseline[i] >= target95) {
-      baselineReach = i;
-    }
-    if (moderateReach === -1 && state.forecastData.moderate[i] >= target95) {
-      moderateReach = i;
-    }
-  }
-  
-  const quartersSaved = baselineReach > 0 && moderateReach > 0 ? baselineReach - moderateReach : 0;
-  document.getElementById('timingSaved').textContent = quartersSaved > 0 ? quartersSaved + ' 季度' : '無法計算';
-}
-
-function updateSummaryComparisonTable() {
-  const tbody = document.querySelector('#summaryComparisonTable tbody');
-  tbody.innerHTML = '';
-  
-  const n = state.forecastData.periods.length;
-  const firstQuarter = 0;
-  const lastQuarter = n - 1;
-  
-  const rows = [
-    {
-      label: '第一季 (' + state.forecastData.periods[firstQuarter] + ')',
-      baseline: state.forecastData.baseline[firstQuarter],
-      conservative: state.forecastData.conservative[firstQuarter],
-      moderate: state.forecastData.moderate[firstQuarter],
-      aggressive: state.forecastData.aggressive[firstQuarter]
-    },
-    {
-      label: '最後一季 (' + state.forecastData.periods[lastQuarter] + ')',
-      baseline: state.forecastData.baseline[lastQuarter],
-      conservative: state.forecastData.conservative[lastQuarter],
-      moderate: state.forecastData.moderate[lastQuarter],
-      aggressive: state.forecastData.aggressive[lastQuarter]
-    }
-  ];
-  
-  // Calculate total incremental
-  const totalIncrementalConservative = state.forecastData.conservative.reduce((sum, v, i) => {
-    const baseline = state.forecastData.baseline[i];
-    return sum + (isFinite(v) && isFinite(baseline) ? v - baseline : 0);
-  }, 0);
-  const totalIncrementalModerate = state.forecastData.moderate.reduce((sum, v, i) => {
-    const baseline = state.forecastData.baseline[i];
-    return sum + (isFinite(v) && isFinite(baseline) ? v - baseline : 0);
-  }, 0);
-  const totalIncrementalAggressive = state.forecastData.aggressive.reduce((sum, v, i) => {
-    const baseline = state.forecastData.baseline[i];
-    return sum + (isFinite(v) && isFinite(baseline) ? v - baseline : 0);
-  }, 0);
-  
-  rows.push({
-    label: '**總增量帳戶**',
-    baseline: 0,
-    conservative: totalIncrementalConservative,
-    moderate: totalIncrementalModerate,
-    aggressive: totalIncrementalAggressive
-  });
-  
-  rows.forEach(row => {
-    const tr = document.createElement('tr');
-    const isBold = row.label.includes('**');
-    const displayLabel = row.label.replace(/\*\*/g, '');
-    
-    tr.innerHTML = `
-      <td style="${isBold ? 'font-weight: var(--font-weight-semibold); background: var(--color-bg-2);' : ''}">${displayLabel}</td>
-      <td style="${isBold ? 'font-weight: var(--font-weight-semibold); background: var(--color-bg-2);' : ''}">${formatNumber(row.baseline)}</td>
-      <td style="${isBold ? 'font-weight: var(--font-weight-semibold); background: var(--color-bg-2); color: #3b82f6;' : ''}">${formatNumber(row.conservative)}</td>
-      <td style="${isBold ? 'font-weight: var(--font-weight-semibold); background: var(--color-bg-2); color: #10b981;' : ''}">${formatNumber(row.moderate)}</td>
-      <td style="${isBold ? 'font-weight: var(--font-weight-semibold); background: var(--color-bg-2); color: #ef4444;' : ''}">${formatNumber(row.aggressive)}</td>
-    `;
-    tbody.appendChild(tr);
   });
 }
-
-
 
 function displayIncrementalChart() {
   const ctx = document.getElementById('incrementalChart').getContext('2d');
@@ -1707,6 +1429,7 @@ function displaySummaryStats() {
 function calculateROI() {
   const devCost = parseFloat(document.getElementById('devCost').value);
   const maintCost = parseFloat(document.getElementById('maintCost').value);
+  const acquisitionCost = parseFloat(document.getElementById('acquisitionCost').value);
   const revenuePerAccount = parseFloat(document.getElementById('revenuePerAccount').value);
   
   const forecastYears = parseInt(document.getElementById('forecastYears').value);
@@ -1716,49 +1439,23 @@ function calculateROI() {
   const roiResults = [];
   
   scenarios.forEach(scenario => {
-    // Calculate cumulative incremental accounts over forecast period
-    const cumulativeIncremental = state.forecastData[scenario].reduce((sum, v, i) => {
-      const baseline = state.forecastData.baseline[i];
-      if (isFinite(v) && isFinite(baseline)) {
-        return sum + Math.max(0, v - baseline);
-      }
-      return sum;
-    }, 0);
+    const totalIncremental = state.forecastData[scenario].reduce((sum, v, i) => 
+      sum + (v - state.forecastData.baseline[i]), 0
+    );
     
-    // Revenue from acceleration (not TAM expansion)
-    // Each quarter's incremental accounts contribute revenue for remaining quarters
-    let totalRevenue = 0;
-    for (let i = 0; i < state.forecastData[scenario].length; i++) {
-      const quarterIncremental = state.forecastData[scenario][i] - state.forecastData.baseline[i];
-      if (isFinite(quarterIncremental) && quarterIncremental > 0) {
-        // This quarter's incremental accounts generate revenue for remaining quarters
-        const remainingQuarters = state.forecastData[scenario].length - i;
-        totalRevenue += quarterIncremental * (revenuePerAccount / 4) * remainingQuarters;
-      }
-    }
+    const incrementalRevenue = totalIncremental * revenuePerAccount * forecastYears;
+    const incrementalAcquisitionCost = totalIncremental * acquisitionCost;
+    const netBenefit = incrementalRevenue - incrementalAcquisitionCost - totalPlatformCost;
+    const roi = (netBenefit / totalPlatformCost) * 100;
     
-    const netBenefit = totalRevenue - totalPlatformCost;
-    const roi = totalPlatformCost > 0 ? (netBenefit / totalPlatformCost) * 100 : 0;
-    
-    // Calculate payback period
-    let cumulativeProfit = -totalPlatformCost;
-    let paybackQuarters = -1;
-    for (let i = 0; i < state.forecastData[scenario].length; i++) {
-      const quarterIncremental = state.forecastData[scenario][i] - state.forecastData.baseline[i];
-      if (isFinite(quarterIncremental) && quarterIncremental > 0) {
-        cumulativeProfit += quarterIncremental * (revenuePerAccount / 4);
-        if (cumulativeProfit >= 0 && paybackQuarters === -1) {
-          paybackQuarters = i + 1;
-        }
-      }
-    }
-    
-    const paybackYears = paybackQuarters > 0 ? paybackQuarters / 4 : Infinity;
+    // Calculate payback period (simplified)
+    const annualBenefit = netBenefit / forecastYears;
+    const paybackYears = annualBenefit > 0 ? totalPlatformCost / (annualBenefit + totalPlatformCost / forecastYears) : Infinity;
     
     roiResults.push({
       scenario,
-      cumulativeIncremental,
-      totalRevenue,
+      incrementalRevenue,
+      acquisitionCost: incrementalAcquisitionCost,
       platformCost: totalPlatformCost,
       netBenefit,
       roi,
@@ -1782,45 +1479,18 @@ function displayROIResults(results) {
   results.forEach(result => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td style="font-weight: var(--font-weight-semibold);">${scenarioNames[result.scenario]}</td>
-      <td>${formatNumber(result.cumulativeIncremental)}</td>
-      <td>$${formatNumber(result.totalRevenue)}</td>
+      <td>${scenarioNames[result.scenario]}</td>
+      <td>$${formatNumber(result.incrementalRevenue)}</td>
+      <td>$${formatNumber(result.acquisitionCost)}</td>
       <td>$${formatNumber(result.platformCost)}</td>
       <td style="font-weight: var(--font-weight-semibold); color: ${result.netBenefit > 0 ? 'var(--color-success)' : 'var(--color-error)'}">$${formatNumber(result.netBenefit)}</td>
-      <td style="font-weight: var(--font-weight-semibold); color: ${result.roi > 0 ? 'var(--color-success)' : 'var(--color-error)'}">${result.roi.toFixed(1)}%</td>
-      <td>${result.payback < 100 ? result.payback.toFixed(1) + ' 年' : 'N/A'}</td>
+      <td style="font-weight: var(--font-weight-semibold);">${result.roi.toFixed(1)}%</td>
+      <td>${result.payback < 100 ? result.payback.toFixed(1) : 'N/A'}</td>
     `;
     tbody.appendChild(tr);
   });
   
   document.getElementById('roiResults').style.display = 'block';
-  
-  // Add summary explanation
-  const summaryDiv = document.createElement('div');
-  summaryDiv.style.cssText = 'margin-top: var(--space-16); padding: var(--space-16); background: var(--color-bg-2); border-radius: var(--radius-base); border: 1px solid var(--color-border);';
-  summaryDiv.innerHTML = `
-    <h4 style="margin-bottom: var(--space-12); font-size: var(--font-size-base);">📊 ROI 說明</h4>
-    <p style="font-size: var(--font-size-sm); margin-bottom: var(--space-8);">
-      <strong>累計增量帳戶：</strong>在 ${parseInt(document.getElementById('forecastYears').value)} 年預測期間，相對於基線的額外帳戶總數
-    </p>
-    <p style="font-size: var(--font-size-sm); margin-bottom: var(--space-8);">
-      <strong>加速收益：</strong>提早獲得這些帳戶的收入價值（每季度增量×剩餘季度數×單季收益）
-    </p>
-    <p style="font-size: var(--font-size-sm); margin-bottom: var(--space-8);">
-      <strong>平台成本：</strong>開發成本 + (年度維護成本 × 預測年數)
-    </p>
-    <p style="font-size: var(--font-size-sm); margin: 0;">
-      <strong>回本期：</strong>累計收益超過平台成本所需的時間
-    </p>
-  `;
-  
-  const roiResults = document.getElementById('roiResults');
-  const existingSummary = roiResults.querySelector('.roi-summary');
-  if (existingSummary) {
-    existingSummary.remove();
-  }
-  summaryDiv.className = 'roi-summary';
-  roiResults.appendChild(summaryDiv);
 }
 
 function exportCSV() {
@@ -1853,109 +1523,13 @@ function exportCSV() {
   window.URL.revokeObjectURL(url);
 }
 
-// Export functions
-function exportChartPNG() {
-  try {
-    const canvas = document.getElementById('forecastChart');
-    const url = canvas.toDataURL('image/png');
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `forecast_${state.currentChartView}_${Date.now()}.png`;
-    a.click();
-    showExportMessage('✓ 圖表已匯出為 PNG', 'success');
-  } catch (error) {
-    console.error('PNG export failed:', error);
-    showExportMessage('✘ 匯出失敗 - 請嘗試其他格式', 'error');
-  }
-}
-
-function exportChartSVG() {
-  try {
-    // For SVG export, we'll convert the canvas to SVG format
-    // This is a simplified version - in production you'd use a library like canvas2svg
-    const canvas = document.getElementById('forecastChart');
-    const imgData = canvas.toDataURL('image/png');
-    
-    // Create SVG wrapper
-    const svgString = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${canvas.width}" height="${canvas.height}">
-  <image width="${canvas.width}" height="${canvas.height}" xlink:href="${imgData}"/>
-</svg>`;
-    
-    const blob = new Blob([svgString], { type: 'image/svg+xml' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `forecast_${state.currentChartView}_${Date.now()}.svg`;
-    a.click();
-    window.URL.revokeObjectURL(url);
-    showExportMessage('✓ 圖表已匯出為 SVG', 'success');
-  } catch (error) {
-    console.error('SVG export failed:', error);
-    showExportMessage('✘ 匯出失敗 - 請嘗試其他格式', 'error');
-  }
-}
-
-function exportChartPDF() {
-  try {
-    const canvas = document.getElementById('forecastChart');
-    const imgData = canvas.toDataURL('image/png');
-
-    const reportWindow = window.open('', '_blank');
-    if (!reportWindow) {
-      showExportMessage('✘ 無法開啟新視窗，請允許彈出視窗', 'error');
-      return;
-    }
-
-    reportWindow.document.title = 'Gompertz 預測報告';
-
-    const style = reportWindow.document.createElement('style');
-    style.textContent = `
-      body { font-family: Arial, sans-serif; padding: 20px; }
-      h1 { color: #1a5f7a; }
-      img { max-width: 100%; height: auto; margin: 20px 0; }
-      table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-      th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-      th { background-color: #f2f2f2; }
-    `;
-    reportWindow.document.head.appendChild(style);
-
-    const h1 = reportWindow.document.createElement('h1');
-    h1.textContent = 'Gompertz 曲線預測報告';
-    reportWindow.document.body.appendChild(h1);
-
-    const p1 = reportWindow.document.createElement('p');
-    p1.innerHTML = `<strong>生成時間:</strong> ${new Date().toLocaleString('zh-TW')}`;
-    reportWindow.document.body.appendChild(p1);
-
-    const h2 = reportWindow.document.createElement('h2');
-    h2.textContent = '預測圖表';
-    reportWindow.document.body.appendChild(h2);
-
-    const img = reportWindow.document.createElement('img');
-    img.src = imgData;
-    img.alt = '預測圖表';
-    reportWindow.document.body.appendChild(img);
-
-    const paramsDiv = reportWindow.document.createElement('div');
-    paramsDiv.innerHTML = `
-      <h2>模型參數</h2>
-      <p><strong>K (承載容量):</strong> ${formatNumber(state.currentK)}</p>
-      <p><strong>b (成長率):</strong> ${state.fittedParams ? state.fittedParams.b.toFixed(4) : 'N/A'}</p>
-      <p><strong>t₀ (轉折點):</strong> ${state.fittedParams ? state.fittedParams.t0.toFixed(2) : 'N/A'}</p>
-    `;
-    reportWindow.document.body.appendChild(paramsDiv);
-
-    const pPrint = reportWindow.document.createElement('p');
-    pPrint.innerHTML = '<em>請使用瀏覽器的列印功能儲存為 PDF</em>';
-    reportWindow.document.body.appendChild(pPrint);
-
-    reportWindow.document.close();
-    showExportMessage('✓ 報告已開啟，請使用瀏覽器列印功能儲存為 PDF', 'success');
-  } catch (error) {
-    console.error('PDF export failed:', error);
-    showExportMessage('✘ 匯出失敗 - 請嘗試其他格式', 'error');
-  }
+function exportChart() {
+  const canvas = document.getElementById('forecastChart');
+  const url = canvas.toDataURL('image/png');
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'forecast_chart.png';
+  a.click();
 }
 
 // Interpolation methods
@@ -2110,10 +1684,8 @@ function forwardFill(data, index) {
 // Event listeners
 document.addEventListener('DOMContentLoaded', () => {
   // Load sample data on page load
-  // loadSampleData(); // <--- 像這樣註解掉
-
-  // Step 1 events
-  document.getElementById('loadSampleBtn').addEventListener('click', loadSampleData);
+  loadSampleData();
+  
   // Interpolation method change listener
   document.querySelectorAll('input[name="interpolation"]').forEach(radio => {
     radio.addEventListener('change', (e) => {
@@ -2183,44 +1755,9 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   
   document.getElementById('exportCSVBtn').addEventListener('click', exportCSV);
-  document.getElementById('exportPNG').addEventListener('click', exportChartPNG);
-  document.getElementById('exportSVG').addEventListener('click', exportChartSVG);
-  document.getElementById('exportPDF').addEventListener('click', exportChartPDF);
+  document.getElementById('exportChartBtn').addEventListener('click', exportChart);
   document.getElementById('calculateROIBtn').addEventListener('click', calculateROI);
-  
-  // Manual K events
-  document.getElementById('useCustomK').addEventListener('change', (e) => {
-    const customKSection = document.getElementById('customKSection');
-    if (e.target.checked) {
-      customKSection.style.display = 'block';
-      document.getElementById('customKValue').value = state.autoFittedK;
-    } else {
-      customKSection.style.display = 'none';
-      state.useCustomK = false;
-      state.currentK = state.autoFittedK;
-      state.fittedParams.K = state.autoFittedK;
-      document.getElementById('paramK').innerHTML = '✔ ' + formatNumber(state.autoFittedK);
-      document.getElementById('currentKValue').textContent = `自動擬合 K = ${formatNumber(state.currentK)} ✓`;
-      document.getElementById('currentKStatus').style.background = 'var(--color-bg-3)';
-      document.getElementById('currentKStatus').style.border = 'none';
-      displayFittingChart();
-      showToast('✓ 已還原為自動擬合 K 值');
-    }
-  });
-  
-  document.getElementById('applyCustomK').addEventListener('click', applyCustomK);
-  
-  document.getElementById('customKValue').addEventListener('input', () => {
-    const warningDiv = document.getElementById('kWarning');
-    warningDiv.style.display = 'none';
-  });
-  
-  // Chart view removed - using single unified view
   
   // Initialize sliders
   initializeSliders();
-  
-  // Set initial chart view
-  state.currentChartView = 'absolute';
-}); // Closing brace for the DOMContentLoaded event listener
-}
+});
