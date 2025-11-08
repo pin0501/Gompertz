@@ -688,8 +688,36 @@ function displayDataPreview(data) {
       <td>${statusBadge}</td>
       <td>${outlierBadge}</td>
       <td style="font-size: var(--font-size-sm);">${recommendation}</td>
-      <td class="cell-actions">${actions}</td>
+      <td class="cell-actions"></td> 
     `;
+
+    // --- 這是修改的部分 ---
+    const actionsCell = tr.querySelector('.cell-actions');
+
+    if (row.isMissing) {
+      const editBtn = document.createElement('button');
+      editBtn.className = 'btn btn--sm btn--outline';
+      editBtn.textContent = '手動輸入';
+      // 使用 addEventListener，這是 CSP 安全的
+      editBtn.addEventListener('click', () => editCell(index));
+      actionsCell.appendChild(editBtn);
+    } else if (row.dataType === 'Interpolated') {
+      const modifyBtn = document.createElement('button');
+      modifyBtn.className = 'btn btn--sm btn--outline';
+      modifyBtn.textContent = '修改';
+      modifyBtn.addEventListener('click', () => editCell(index));
+      actionsCell.appendChild(modifyBtn);
+    } else if (row.isOutlier) {
+      const confirmBtn = document.createElement('button');
+      confirmBtn.className = 'btn btn--sm btn--outline';
+      confirmBtn.textContent = '確認無誤';
+      confirmBtn.addEventListener('click', () => confirmCell(index));
+      actionsCell.appendChild(confirmBtn);
+    } else {
+      actionsCell.textContent = '-';
+    }
+    // --- 修改結束 ---
+
     tbody.appendChild(tr);
   });
   
@@ -1870,60 +1898,63 @@ function exportChartSVG() {
 
 function exportChartPDF() {
   try {
-    // Create a simple text-based report as PDF alternative
-    // In production, you'd use jsPDF library
     const canvas = document.getElementById('forecastChart');
     const imgData = canvas.toDataURL('image/png');
-    
-    // For now, we'll create an HTML page that can be printed to PDF
+
     const reportWindow = window.open('', '_blank');
-    reportWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Gompertz 預測報告</title>
-        <style>
-          body { font-family: Arial, sans-serif; padding: 20px; }
-          h1 { color: #1a5f7a; }
-          img { max-width: 100%; height: auto; margin: 20px 0; }
-          table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-          th { background-color: #f2f2f2; }
-        </style>
-      </head>
-      <body>
-        <h1>Gompertz 曲線預測報告</h1>
-        <p><strong>生成時間:</strong> ${new Date().toLocaleString('zh-TW')}</p>
-        <h2>預測圖表</h2>
-        <img src="${imgData}" alt="預測圖表" />
-        <h2>模型參數</h2>
-        <p><strong>K (承載容量):</strong> ${formatNumber(state.currentK)}</p>
-        <p><strong>b (成長率):</strong> ${state.fittedParams.b.toFixed(4)}</p>
-        <p><strong>t₀ (轉折點):</strong> ${state.fittedParams.t0.toFixed(2)}</p>
-        <p><em>請使用瀏覽器的列印功能儲存為 PDF</em></p>
-      </body>
-      </html>
-    `);
+    if (!reportWindow) {
+      showExportMessage('✘ 無法開啟新視窗，請允許彈出視窗', 'error');
+      return;
+    }
+
+    reportWindow.document.title = 'Gompertz 預測報告';
+
+    const style = reportWindow.document.createElement('style');
+    style.textContent = `
+      body { font-family: Arial, sans-serif; padding: 20px; }
+      h1 { color: #1a5f7a; }
+      img { max-width: 100%; height: auto; margin: 20px 0; }
+      table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+      th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+      th { background-color: #f2f2f2; }
+    `;
+    reportWindow.document.head.appendChild(style);
+
+    const h1 = reportWindow.document.createElement('h1');
+    h1.textContent = 'Gompertz 曲線預測報告';
+    reportWindow.document.body.appendChild(h1);
+
+    const p1 = reportWindow.document.createElement('p');
+    p1.innerHTML = `<strong>生成時間:</strong> ${new Date().toLocaleString('zh-TW')}`;
+    reportWindow.document.body.appendChild(p1);
+
+    const h2 = reportWindow.document.createElement('h2');
+    h2.textContent = '預測圖表';
+    reportWindow.document.body.appendChild(h2);
+
+    const img = reportWindow.document.createElement('img');
+    img.src = imgData;
+    img.alt = '預測圖表';
+    reportWindow.document.body.appendChild(img);
+
+    const paramsDiv = reportWindow.document.createElement('div');
+    paramsDiv.innerHTML = `
+      <h2>模型參數</h2>
+      <p><strong>K (承載容量):</strong> ${formatNumber(state.currentK)}</p>
+      <p><strong>b (成長率):</strong> ${state.fittedParams ? state.fittedParams.b.toFixed(4) : 'N/A'}</p>
+      <p><strong>t₀ (轉折點):</strong> ${state.fittedParams ? state.fittedParams.t0.toFixed(2) : 'N/A'}</p>
+    `;
+    reportWindow.document.body.appendChild(paramsDiv);
+
+    const pPrint = reportWindow.document.createElement('p');
+    pPrint.innerHTML = '<em>請使用瀏覽器的列印功能儲存為 PDF</em>';
+    reportWindow.document.body.appendChild(pPrint);
+
     reportWindow.document.close();
     showExportMessage('✓ 報告已開啟，請使用瀏覽器列印功能儲存為 PDF', 'success');
   } catch (error) {
     console.error('PDF export failed:', error);
     showExportMessage('✘ 匯出失敗 - 請嘗試其他格式', 'error');
-  }
-}
-
-function showExportMessage(message, type) {
-  const messageDiv = document.getElementById('exportMessage');
-  messageDiv.className = type === 'success' ? 'export-success' : 'export-error';
-  messageDiv.textContent = message;
-  messageDiv.style.display = 'block';
-  
-  setTimeout(() => {
-    messageDiv.style.display = 'none';
-  }, 3000);
-  
-  if (type === 'success') {
-    showToast(message);
   }
 }
 
@@ -2192,4 +2223,4 @@ document.addEventListener('DOMContentLoaded', () => {
   // Set initial chart view
   state.currentChartView = 'absolute';
 }); // Closing brace for the DOMContentLoaded event listener
-} // Closing brace for the last function or block
+}
