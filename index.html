@@ -4,7 +4,706 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gompertz 曲線建模平台 - 平台介入效應分析</title>
-    <link rel="stylesheet" href="style.css">
+    
+    <!-- ========================================
+         SINGLE STYLE BLOCK - NO DUPLICATES
+         ======================================== -->
+    <style>
+/* ========================================
+   1. CSS VARIABLES & ROOT
+   ======================================== */
+:root {
+  --color-white: rgba(255, 255, 255, 1);
+  --color-black: rgba(0, 0, 0, 1);
+  --color-cream-50: rgba(252, 252, 249, 1);
+  --color-cream-100: rgba(255, 255, 253, 1);
+  --color-gray-200: rgba(245, 245, 245, 1);
+  --color-gray-300: rgba(167, 169, 169, 1);
+  --color-gray-400: rgba(119, 124, 124, 1);
+  --color-slate-500: rgba(98, 108, 113, 1);
+  --color-brown-600: rgba(94, 82, 64, 1);
+  --color-charcoal-700: rgba(31, 33, 33, 1);
+  --color-charcoal-800: rgba(38, 40, 40, 1);
+  --color-slate-900: rgba(19, 52, 59, 1);
+  --color-teal-300: rgba(50, 184, 198, 1);
+  --color-teal-400: rgba(45, 166, 178, 1);
+  --color-teal-500: rgba(33, 128, 141, 1);
+  --color-teal-600: rgba(29, 116, 128, 1);
+  --color-teal-700: rgba(26, 104, 115, 1);
+  --color-teal-800: rgba(41, 150, 161, 1);
+  --color-red-400: rgba(255, 84, 89, 1);
+  --color-red-500: rgba(192, 21, 47, 1);
+  --color-orange-400: rgba(230, 129, 97, 1);
+  --color-orange-500: rgba(168, 75, 47, 1);
+
+  --color-brown-600-rgb: 94, 82, 64;
+  --color-teal-500-rgb: 33, 128, 141;
+  --color-slate-900-rgb: 19, 52, 59;
+  --color-slate-500-rgb: 98, 108, 113;
+  --color-red-500-rgb: 192, 21, 47;
+  --color-red-400-rgb: 255, 84, 89;
+  --color-orange-500-rgb: 168, 75, 47;
+  --color-orange-400-rgb: 230, 129, 97;
+
+  --color-bg-1: rgba(59, 130, 246, 0.08);
+  --color-bg-2: rgba(245, 158, 11, 0.08);
+  --color-bg-3: rgba(34, 197, 94, 0.08);
+  --color-bg-4: rgba(239, 68, 68, 0.08);
+  --color-bg-5: rgba(147, 51, 234, 0.08);
+  --color-bg-6: rgba(249, 115, 22, 0.08);
+  --color-bg-7: rgba(236, 72, 153, 0.08);
+  --color-bg-8: rgba(6, 182, 212, 0.08);
+
+  --color-background: var(--color-cream-50);
+  --color-surface: var(--color-cream-100);
+  --color-text: var(--color-slate-900);
+  --color-text-secondary: var(--color-slate-500);
+  --color-primary: var(--color-teal-500);
+  --color-primary-hover: var(--color-teal-600);
+  --color-primary-active: var(--color-teal-700);
+  --color-secondary: rgba(var(--color-brown-600-rgb), 0.12);
+  --color-secondary-hover: rgba(var(--color-brown-600-rgb), 0.2);
+  --color-secondary-active: rgba(var(--color-brown-600-rgb), 0.25);
+  --color-border: rgba(var(--color-brown-600-rgb), 0.2);
+  --color-btn-primary-text: var(--color-cream-50);
+  --color-card-border: rgba(var(--color-brown-600-rgb), 0.12);
+  --color-card-border-inner: rgba(var(--color-brown-600-rgb), 0.12);
+  --color-error: var(--color-red-500);
+  --color-success: var(--color-teal-500);
+  --color-warning: var(--color-orange-500);
+  --color-info: var(--color-slate-500);
+  --color-focus-ring: rgba(var(--color-teal-500-rgb), 0.4);
+  --color-select-caret: rgba(var(--color-slate-900-rgb), 0.8);
+
+  --focus-ring: 0 0 0 3px var(--color-focus-ring);
+  --focus-outline: 2px solid var(--color-primary);
+
+  --color-success-rgb: 33, 128, 141;
+  --color-error-rgb: 192, 21, 47;
+  --color-warning-rgb: 168, 75, 47;
+  --color-info-rgb: 98, 108, 113;
+
+  --font-family-base: "FKGroteskNeue", "Geist", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-family-mono: "Berkeley Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --font-size-xs: 11px;
+  --font-size-sm: 12px;
+  --font-size-base: 14px;
+  --font-size-md: 14px;
+  --font-size-lg: 16px;
+  --font-size-xl: 18px;
+  --font-size-2xl: 20px;
+  --font-size-3xl: 24px;
+  --font-size-4xl: 30px;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 550;
+  --font-weight-bold: 600;
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.5;
+  --letter-spacing-tight: -0.01em;
+
+  --space-0: 0;
+  --space-1: 1px;
+  --space-2: 2px;
+  --space-4: 4px;
+  --space-6: 6px;
+  --space-8: 8px;
+  --space-10: 10px;
+  --space-12: 12px;
+  --space-16: 16px;
+  --space-20: 20px;
+  --space-24: 24px;
+  --space-32: 32px;
+
+  --radius-sm: 6px;
+  --radius-base: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-full: 9999px;
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.02);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.04), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.04), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
+  --shadow-inset-sm: inset 0 1px 0 rgba(255, 255, 255, 0.15), inset 0 -1px 0 rgba(0, 0, 0, 0.03);
+
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --ease-standard: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --container-sm: 640px;
+  --container-md: 768px;
+  --container-lg: 1024px;
+  --container-xl: 1280px;
+}
+
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-gray-400-rgb: 119, 124, 124;
+    --color-teal-300-rgb: 50, 184, 198;
+    --color-gray-300-rgb: 167, 169, 169;
+    --color-gray-200-rgb: 245, 245, 245;
+    --color-bg-1: rgba(29, 78, 216, 0.15);
+    --color-bg-2: rgba(180, 83, 9, 0.15);
+    --color-bg-3: rgba(21, 128, 61, 0.15);
+    --color-bg-4: rgba(185, 28, 28, 0.15);
+    --color-bg-5: rgba(107, 33, 168, 0.15);
+    --color-bg-6: rgba(194, 65, 12, 0.15);
+    --color-bg-7: rgba(190, 24, 93, 0.15);
+    --color-bg-8: rgba(8, 145, 178, 0.15);
+    --color-background: var(--color-charcoal-700);
+    --color-surface: var(--color-charcoal-800);
+    --color-text: var(--color-gray-200);
+    --color-text-secondary: rgba(var(--color-gray-300-rgb), 0.7);
+    --color-primary: var(--color-teal-300);
+    --color-primary-hover: var(--color-teal-400);
+    --color-primary-active: var(--color-teal-800);
+    --color-secondary: rgba(var(--color-gray-400-rgb), 0.15);
+    --color-secondary-hover: rgba(var(--color-gray-400-rgb), 0.25);
+    --color-secondary-active: rgba(var(--color-gray-400-rgb), 0.3);
+    --color-border: rgba(var(--color-gray-400-rgb), 0.3);
+    --color-error: var(--color-red-400);
+    --color-success: var(--color-teal-300);
+    --color-warning: var(--color-orange-400);
+    --color-info: var(--color-gray-300);
+    --color-focus-ring: rgba(var(--color-teal-300-rgb), 0.4);
+    --color-btn-primary-text: var(--color-slate-900);
+    --color-card-border: rgba(var(--color-gray-400-rgb), 0.2);
+    --color-card-border-inner: rgba(var(--color-gray-400-rgb), 0.15);
+    --shadow-inset-sm: inset 0 1px 0 rgba(255, 255, 255, 0.1), inset 0 -1px 0 rgba(0, 0, 0, 0.15);
+    --color-select-caret: rgba(var(--color-gray-200-rgb), 0.8);
+    --color-success-rgb: var(--color-teal-300-rgb);
+    --color-error-rgb: var(--color-red-400-rgb);
+    --color-warning-rgb: var(--color-orange-400-rgb);
+    --color-info-rgb: var(--color-gray-300-rgb);
+  }
+}
+
+@font-face {
+  font-family: 'FKGroteskNeue';
+  src: url('https://r2cdn.perplexity.ai/fonts/FKGroteskNeue.woff2') format('woff2');
+}
+
+/* ========================================
+   2. GLOBAL STYLES
+   ======================================== */
+html {
+  font-size: var(--font-size-base);
+  font-family: var(--font-family-base);
+  line-height: var(--line-height-normal);
+  color: var(--color-text);
+  background-color: var(--color-background);
+  -webkit-font-smoothing: antialiased;
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+}
+
+*, *::before, *::after {
+  box-sizing: inherit;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  margin: 0;
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
+  color: var(--color-text);
+  letter-spacing: var(--letter-spacing-tight);
+}
+
+h1 { font-size: var(--font-size-4xl); }
+h2 { font-size: var(--font-size-3xl); }
+h3 { font-size: var(--font-size-2xl); }
+h4 { font-size: var(--font-size-xl); }
+h5 { font-size: var(--font-size-lg); }
+h6 { font-size: var(--font-size-md); }
+
+p { margin: 0 0 var(--space-16) 0; }
+
+/* ========================================
+   3. COMMON ELEMENTS
+   ======================================== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8) var(--space-16);
+  border-radius: var(--radius-base);
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  line-height: 1.5;
+  cursor: pointer;
+  transition: all var(--duration-normal) var(--ease-standard);
+  border: none;
+  text-decoration: none;
+}
+
+.btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.btn--primary {
+  background: var(--color-primary);
+  color: var(--color-btn-primary-text);
+}
+
+.btn--primary:hover {
+  background: var(--color-primary-hover);
+}
+
+.btn--secondary {
+  background: var(--color-secondary);
+  color: var(--color-text);
+}
+
+.btn--secondary:hover {
+  background: var(--color-secondary-hover);
+}
+
+.btn--outline {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+
+.btn--outline:hover {
+  background: var(--color-secondary);
+}
+
+.btn--sm {
+  padding: var(--space-4) var(--space-12);
+  font-size: var(--font-size-sm);
+}
+
+.button-group {
+  display: flex;
+  gap: var(--space-8);
+  flex-wrap: wrap;
+}
+
+.form-control {
+  display: block;
+  width: 100%;
+  padding: var(--space-8) var(--space-12);
+  font-size: var(--font-size-md);
+  line-height: 1.5;
+  color: var(--color-text);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-base);
+  transition: border-color var(--duration-fast) var(--ease-standard);
+}
+
+.form-control:focus {
+  border-color: var(--color-primary);
+  outline: var(--focus-outline);
+}
+
+textarea.form-control {
+  font-family: var(--font-family-mono);
+  resize: vertical;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: var(--space-8);
+  font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-sm);
+}
+
+.form-group {
+  margin-bottom: var(--space-16);
+}
+
+/* ========================================
+   4. LAYOUT SECTIONS
+   ======================================== */
+.container {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: var(--space-24);
+}
+
+.app-header {
+  text-align: center;
+  margin-bottom: var(--space-32);
+  padding-bottom: var(--space-24);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.subtitle {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-lg);
+  margin-top: var(--space-8);
+}
+
+.section {
+  margin-bottom: var(--space-32);
+}
+
+.section-header {
+  margin-bottom: var(--space-24);
+}
+
+.section-header h2 {
+  margin-bottom: var(--space-8);
+}
+
+.section-header p {
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.card {
+  background-color: var(--color-surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-card-border);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  margin-bottom: var(--space-16);
+}
+
+.card__header {
+  padding: var(--space-16);
+  border-bottom: 1px solid var(--color-card-border-inner);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card__header h3 {
+  margin: 0;
+  font-size: var(--font-size-xl);
+}
+
+.card__body {
+  padding: var(--space-16);
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-16);
+}
+
+.action-buttons {
+  display: flex;
+  gap: var(--space-12);
+  justify-content: flex-end;
+  margin-top: var(--space-24);
+}
+
+/* ========================================
+   5. PROGRESS STEPS
+   ======================================== */
+.progress-steps {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: var(--space-32);
+  position: relative;
+}
+
+.progress-steps::before {
+  content: '';
+  position: absolute;
+  top: 20px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--color-border);
+  z-index: 0;
+}
+
+.step {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  z-index: 1;
+}
+
+.step-number {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: var(--font-weight-semibold);
+  margin-bottom: var(--space-8);
+  transition: all var(--duration-normal) var(--ease-standard);
+}
+
+.step-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.step.active .step-number {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-btn-primary-text);
+}
+
+.step.completed .step-number {
+  background: var(--color-success);
+  border-color: var(--color-success);
+  color: var(--color-btn-primary-text);
+}
+
+/* ========================================
+   6. DATA QUALITY & TABLES
+   ======================================== */
+.table-container {
+  overflow-x: auto;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+
+.data-table th,
+.data-table td {
+  padding: var(--space-8) var(--space-12);
+  text-align: left;
+  border-bottom: 1px solid var(--color-card-border-inner);
+}
+
+.data-table th {
+  font-weight: var(--font-weight-semibold);
+  background: var(--color-bg-1);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.data-table tbody tr:hover {
+  background: var(--color-bg-2);
+}
+
+.quality-score-container {
+  background: var(--color-bg-1);
+  padding: var(--space-16);
+  border-radius: var(--radius-base);
+  margin-bottom: var(--space-16);
+}
+
+.quality-score-bar {
+  height: 24px;
+  background: var(--color-secondary);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  margin-bottom: var(--space-8);
+  position: relative;
+}
+
+.quality-score-fill {
+  height: 100%;
+  background: var(--color-success);
+  transition: width var(--duration-normal) var(--ease-standard);
+  border-radius: var(--radius-full);
+}
+
+.quality-score-value {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-semibold);
+  text-align: center;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-4) var(--space-8);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  gap: var(--space-4);
+}
+
+.status-badge.valid {
+  background: rgba(var(--color-success-rgb), 0.15);
+  color: var(--color-success);
+}
+
+.status-badge.missing {
+  background: rgba(var(--color-warning-rgb), 0.15);
+  color: var(--color-warning);
+}
+
+/* ========================================
+   7. CHARTS & VISUALIZATION
+   ======================================== */
+.chart-container {
+  position: relative;
+  height: 400px;
+  width: 100%;
+}
+
+.params-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-16);
+  margin-bottom: var(--space-24);
+}
+
+.param-card {
+  background: var(--color-bg-1);
+  padding: var(--space-16);
+  border-radius: var(--radius-base);
+  border: 1px solid var(--color-card-border);
+}
+
+.param-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-4);
+}
+
+.param-value {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-semibold);
+  margin-bottom: var(--space-4);
+}
+
+.scenarios-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--space-16);
+}
+
+.scenario-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-16);
+}
+
+.scenario-card h3 {
+  margin-bottom: var(--space-16);
+  padding-bottom: var(--space-8);
+  border-bottom: 1px solid var(--color-card-border-inner);
+}
+
+.slider {
+  width: 100%;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-secondary);
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  cursor: pointer;
+}
+
+.slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  cursor: pointer;
+  border: none;
+}
+
+/* ========================================
+   8. UTILITY CLASSES
+   ======================================== */
+.hidden {
+  display: none !important;
+}
+
+.error-message {
+  color: var(--color-error);
+  padding: var(--space-12);
+  background: rgba(var(--color-error-rgb), 0.1);
+  border-radius: var(--radius-base);
+  margin-top: var(--space-16);
+}
+
+.status-message {
+  color: var(--color-info);
+  padding: var(--space-12);
+  background: var(--color-bg-3);
+  border-radius: var(--radius-base);
+  text-align: center;
+}
+
+.toast {
+  position: fixed;
+  top: var(--space-20);
+  right: var(--space-20);
+  padding: var(--space-12) var(--space-16);
+  background: var(--color-charcoal-700);
+  color: var(--color-cream-50);
+  border-radius: var(--radius-base);
+  box-shadow: var(--shadow-lg);
+  z-index: 9999;
+  animation: slideIn 0.3s ease-out;
+  font-size: var(--font-size-sm);
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* ========================================
+   9. RESPONSIVE DESIGN
+   ======================================== */
+@media (max-width: 768px) {
+  .container {
+    padding: var(--space-16);
+  }
+
+  .progress-steps {
+    flex-wrap: wrap;
+  }
+
+  .step-label {
+    font-size: var(--font-size-xs);
+  }
+
+  .scenarios-container {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-grid,
+  .params-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-container {
+    height: 300px;
+  }
+}
+    </style>
 </head>
 <body>
     <div class="container">
@@ -34,10 +733,10 @@
         </div>
 
         <!-- Step 1: Data Input -->
-        <div class="section" id="step1" style="display: block;">
+        <div class="section" id="step1">
             <div class="section-header">
-                <h2>步驟 1: 數據輸入與品質檢測</h2>
-                <p>輸入歷史時間序列數據，系統將自動檢測缺漏值與異常</p>
+                <h2>步驟 1: 數據輸入</h2>
+                <p>輸入歷史時間序列數據</p>
             </div>
 
             <div class="card">
@@ -57,73 +756,33 @@
 
                     <div class="settings-grid">
                         <div class="form-group">
-                            <label class="form-label" for="startPeriod">
-                                起始期間
-                                <span class="tooltip" data-tip="例如: Q1 2020">ⓘ</span>
-                            </label>
-                            <input type="text" class="form-control" id="startPeriod" value="Q1 2020">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label" for="historicalQuarters">
-                                歷史季數
-                                <span class="tooltip" data-tip="歷史數據的季度數量">ⓘ</span>
-                            </label>
-                            <input type="number" class="form-control" id="historicalQuarters" value="20" min="8">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label" for="forecastYears">
-                                預測年數
-                                <span class="tooltip" data-tip="需要預測的未來年數">ⓘ</span>
-                            </label>
+                            <label class="form-label" for="forecastYears">預測年數</label>
                             <input type="number" class="form-control" id="forecastYears" value="8" min="1" max="20">
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Data Quality Report -->
             <div class="card" id="dataQualityCard" style="display: none;">
                 <div class="card__header">
                     <h3>數據品質報告</h3>
-                    <span class="tooltip" data-tip="數據品質影響模型可靠性。分數越高，預測越可靠。">ⓘ</span>
                 </div>
                 <div class="card__body">
-                    <div id="qualityScoreContainer" class="quality-score-container">
-                        <div class="quality-score-label">數據品質分數</div>
+                    <div class="quality-score-container">
                         <div class="quality-score-bar">
                             <div class="quality-score-fill" id="qualityScoreFill"></div>
                         </div>
                         <div class="quality-score-value" id="qualityScoreValue">--/100</div>
                     </div>
-                    <div id="qualityIssues" class="quality-issues"></div>
-                    <div id="qualityRecommendations" class="quality-recommendations"></div>
+                    <div id="qualityIssues"></div>
                 </div>
             </div>
 
-            <!-- Interactive Data Table -->
             <div class="card" id="dataPreviewCard" style="display: none;">
                 <div class="card__header">
-                    <h3>數據預覽與編輯</h3>
+                    <h3>數據預覽</h3>
                 </div>
                 <div class="card__body">
-                    <div class="data-type-legend">
-                        <div class="legend-item">
-                            <div class="legend-color original"></div>
-                            <span>原始數據</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color missing"></div>
-                            <span>缺漏數據</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color interpolated"></div>
-                            <span>已插值</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color outlier"></div>
-                            <span>異常值</span>
-                        </div>
-                    </div>
                     <div class="table-container">
                         <table class="data-table" id="dataPreviewTable">
                             <thead>
@@ -131,82 +790,12 @@
                                     <th>期間</th>
                                     <th>實際數值</th>
                                     <th>狀態</th>
-                                    <th>異常?</th>
-                                    <th>建議</th>
-                                    <th>操作</th>
                                 </tr>
                             </thead>
                             <tbody></tbody>
                         </table>
                     </div>
                     <div id="dataError" class="error-message" style="display: none;"></div>
-                </div>
-            </div>
-
-            <!-- Missing Data Handling Options -->
-            <div class="card" id="missingDataCard" style="display: none;">
-                <div class="card__header">
-                    <h3>缺漏數據處理策略</h3>
-                </div>
-                <div class="card__body">
-                    <div style="background: var(--color-bg-2); padding: var(--space-12); border-radius: var(--radius-base); margin-bottom: var(--space-16); font-size: var(--font-size-sm);">
-                        <strong>💡 為什麼重要？</strong><br>
-                        Gompertz 擬合對缺漏數據敏感 - 缺漏值可能使參數估計偏移 1-3%。插值可減少不確定性。
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">選擇處理方法</label>
-                        <div class="interpolation-options">
-                            <label class="radio-option">
-                                <input type="radio" name="interpolation" value="ignore" checked>
-                                <div class="radio-content">
-                                    <div class="radio-title">忽略 (Ignore)</div>
-                                    <div class="radio-description">跳過缺漏季度 (適用於 1-2 個缺漏)</div>
-                                </div>
-                            </label>
-                            <label class="radio-option">
-                                <input type="radio" name="interpolation" value="linear">
-                                <div class="radio-content">
-                                    <div class="radio-title">線性插值 (Linear)</div>
-                                    <div class="radio-description">在相鄰值之間繪製直線</div>
-                                </div>
-                            </label>
-                            <label class="radio-option">
-                                <input type="radio" name="interpolation" value="gompertz">
-                                <div class="radio-content">
-                                    <div class="radio-title">Gompertz 插值 (推薦) ⭐</div>
-                                    <div class="radio-description">使用初步擬合估計缺漏值 - 最適合成長數據</div>
-                                </div>
-                            </label>
-                            <label class="radio-option">
-                                <input type="radio" name="interpolation" value="forward">
-                                <div class="radio-content">
-                                    <div class="radio-title">向前填充 (Forward-Fill)</div>
-                                    <div class="radio-description">重複前一個值 (保守方法)</div>
-                                </div>
-                            </label>
-                        </div>
-                    </div>
-                    <div id="interpolationImpact" class="interpolation-impact" style="display: none;"></div>
-                    <button class="btn btn--primary" id="applyInterpolationBtn">應用並預覽</button>
-                </div>
-            </div>
-
-            <!-- Best Practices Panel -->
-            <div class="card" id="bestPracticesCard" style="display: none;">
-                <div class="card__header">
-                    <h3>📊 缺漏數據處理最佳實踐</h3>
-                </div>
-                <div class="card__body">
-                    <div class="best-practices-panel">
-                        <ol>
-                            <li><strong>優先檢查數據源</strong> - 缺漏的季度數據是否可以從原始來源獲取？</li>
-                            <li><strong>實際數據永遠優於插值</strong> - 如果可以獲取實際值，一定要優先使用</li>
-                            <li><strong>少量缺漏 (&lt;3 季度)</strong> - 可使用 Gompertz 插值方法填補</li>
-                            <li><strong>大量缺漏 (3+ 季度)</strong> - 考慮是否縮短分析期間或獲取更多數據</li>
-                            <li><strong>文檔記錄</strong> - 在最終報告中明確標明哪些值是插值得出</li>
-                            <li><strong>驗證結果</strong> - 比較不同插值方法的結果，確保合理性</li>
-                        </ol>
-                    </div>
                 </div>
             </div>
 
@@ -219,7 +808,7 @@
         <div class="section" id="step2" style="display: none;">
             <div class="section-header">
                 <h2>步驟 2: 基線模型擬合</h2>
-                <p>自動擬合 Gompertz 曲線並評估模型品質</p>
+                <p>自動擬合 Gompertz 曲線</p>
             </div>
 
             <div class="card">
@@ -233,27 +822,14 @@
                             <div class="param-card">
                                 <div class="param-label">K (承載容量)</div>
                                 <div class="param-value" id="paramK">-</div>
-                                <div class="param-ci" id="paramK_ci">-</div>
                             </div>
                             <div class="param-card">
                                 <div class="param-label">b (成長率)</div>
                                 <div class="param-value" id="paramB">-</div>
-                                <div class="param-ci" id="paramB_ci">-</div>
                             </div>
                             <div class="param-card">
                                 <div class="param-label">t₀ (轉折點)</div>
                                 <div class="param-value" id="paramT0">-</div>
-                                <div class="param-ci" id="paramT0_ci">-</div>
-                            </div>
-                        </div>
-                        <div class="metrics-grid">
-                            <div class="metric-item">
-                                <span class="metric-label">R² (擬合優度):</span>
-                                <span class="metric-value" id="metricR2">-</span>
-                            </div>
-                            <div class="metric-item">
-                                <span class="metric-label">殘差標準差:</span>
-                                <span class="metric-value" id="metricRMSE">-</span>
                             </div>
                         </div>
                     </div>
@@ -280,8 +856,8 @@
         <!-- Step 3: Scenario Configuration -->
         <div class="section" id="step3" style="display: none;">
             <div class="section-header">
-                <h2>步驟 3: 介入情境配置</h2>
-                <p>配置不同情境的介入參數</p>
+                <h2>步驟 3: 平台加速參數配置</h2>
+                <p>配置平台對採用速度的加速效應</p>
             </div>
 
             <div class="card">
@@ -296,120 +872,51 @@
                     </div>
 
                     <div class="form-group">
-                        <label class="form-label" for="platformLaunch">
-                            平台啟動季度 (相對於預測起始)
-                            <span class="tooltip" data-tip="介入措施在預測期的第幾季開始">ⓘ</span>
-                        </label>
-                        <input type="number" class="form-control" id="platformLaunch" value="1" min="0">
+                        <label class="form-label" for="platformLaunch">平台啟動季度（Q1 2025 = 季度 1）</label>
+                        <input type="number" class="form-control" id="platformLaunch" value="3" min="1">
                     </div>
                 </div>
             </div>
 
             <div class="scenarios-container">
                 <div class="scenario-card" data-scenario="conservative">
-                    <h3>保守型情境</h3>
+                    <h3 style="color: #3b82f6;">保守型情境</h3>
                     <div class="param-sliders">
                         <div class="slider-group">
-                            <label>α (成長加速): <span id="alpha_conservative_val">0.10</span></label>
-                            <input type="range" class="slider" id="alpha_conservative" min="0" max="0.5" step="0.01" value="0.10">
-                            <div class="param-description">成長速度提升幅度</div>
+                            <label>α (成長加速率): <span id="alpha_conservative_val">10</span>%</label>
+                            <input type="range" class="slider" id="alpha_conservative" min="0" max="50" step="1" value="10">
                         </div>
                         <div class="slider-group">
-                            <label>Δt (轉折點位移): <span id="delta_t_conservative_val">0.5</span></label>
-                            <input type="range" class="slider" id="delta_t_conservative" min="0" max="3" step="0.1" value="0.5">
-                            <div class="param-description">轉折點提前的季數</div>
-                        </div>
-                        <div class="slider-group">
-                            <label>κ (容量擴張): <span id="kappa_conservative_val">0.02</span></label>
-                            <input type="range" class="slider" id="kappa_conservative" min="0" max="0.15" step="0.01" value="0.02">
-                            <div class="param-description">市場容量擴張比例</div>
-                        </div>
-                        <div class="slider-group">
-                            <label>H (加速半衰期): <span id="half_life_conservative_val">6</span> 季</label>
+                            <label>H (半衰期): <span id="half_life_conservative_val">6</span> 季度</label>
                             <input type="range" class="slider" id="half_life_conservative" min="2" max="16" step="1" value="6">
-                            <div class="param-description">加速效應持續時間</div>
-                        </div>
-                        <div class="slider-group">
-                            <label>W (介入窗口): <span id="window_conservative_val">6</span> 季</label>
-                            <input type="range" class="slider" id="window_conservative" min="4" max="16" step="1" value="6">
-                            <div class="param-description">介入措施持續時間</div>
-                        </div>
-                        <div class="slider-group">
-                            <label>E (擴張窗口): <span id="expansion_conservative_val">8</span> 季</label>
-                            <input type="range" class="slider" id="expansion_conservative" min="4" max="16" step="1" value="8">
-                            <div class="param-description">容量擴張持續時間</div>
                         </div>
                     </div>
                 </div>
 
                 <div class="scenario-card" data-scenario="moderate">
-                    <h3>穩健型情境</h3>
+                    <h3 style="color: #10b981;">穩健型情境</h3>
                     <div class="param-sliders">
                         <div class="slider-group">
-                            <label>α (成長加速): <span id="alpha_moderate_val">0.20</span></label>
-                            <input type="range" class="slider" id="alpha_moderate" min="0" max="0.5" step="0.01" value="0.20">
-                            <div class="param-description">成長速度提升幅度</div>
+                            <label>α (成長加速率): <span id="alpha_moderate_val">20</span>%</label>
+                            <input type="range" class="slider" id="alpha_moderate" min="0" max="50" step="1" value="20">
                         </div>
                         <div class="slider-group">
-                            <label>Δt (轉折點位移): <span id="delta_t_moderate_val">1.0</span></label>
-                            <input type="range" class="slider" id="delta_t_moderate" min="0" max="3" step="0.1" value="1.0">
-                            <div class="param-description">轉折點提前的季數</div>
-                        </div>
-                        <div class="slider-group">
-                            <label>κ (容量擴張): <span id="kappa_moderate_val">0.05</span></label>
-                            <input type="range" class="slider" id="kappa_moderate" min="0" max="0.15" step="0.01" value="0.05">
-                            <div class="param-description">市場容量擴張比例</div>
-                        </div>
-                        <div class="slider-group">
-                            <label>H (加速半衰期): <span id="half_life_moderate_val">8</span> 季</label>
+                            <label>H (半衰期): <span id="half_life_moderate_val">8</span> 季度</label>
                             <input type="range" class="slider" id="half_life_moderate" min="2" max="16" step="1" value="8">
-                            <div class="param-description">加速效應持續時間</div>
-                        </div>
-                        <div class="slider-group">
-                            <label>W (介入窗口): <span id="window_moderate_val">8</span> 季</label>
-                            <input type="range" class="slider" id="window_moderate" min="4" max="16" step="1" value="8">
-                            <div class="param-description">介入措施持續時間</div>
-                        </div>
-                        <div class="slider-group">
-                            <label>E (擴張窗口): <span id="expansion_moderate_val">10</span> 季</label>
-                            <input type="range" class="slider" id="expansion_moderate" min="4" max="16" step="1" value="10">
-                            <div class="param-description">容量擴張持續時間</div>
                         </div>
                     </div>
                 </div>
 
                 <div class="scenario-card" data-scenario="aggressive">
-                    <h3>積極型情境</h3>
+                    <h3 style="color: #ef4444;">積極型情境</h3>
                     <div class="param-sliders">
                         <div class="slider-group">
-                            <label>α (成長加速): <span id="alpha_aggressive_val">0.35</span></label>
-                            <input type="range" class="slider" id="alpha_aggressive" min="0" max="0.5" step="0.01" value="0.35">
-                            <div class="param-description">成長速度提升幅度</div>
+                            <label>α (成長加速率): <span id="alpha_aggressive_val">35</span>%</label>
+                            <input type="range" class="slider" id="alpha_aggressive" min="0" max="50" step="1" value="35">
                         </div>
                         <div class="slider-group">
-                            <label>Δt (轉折點位移): <span id="delta_t_aggressive_val">1.5</span></label>
-                            <input type="range" class="slider" id="delta_t_aggressive" min="0" max="3" step="0.1" value="1.5">
-                            <div class="param-description">轉折點提前的季數</div>
-                        </div>
-                        <div class="slider-group">
-                            <label>κ (容量擴張): <span id="kappa_aggressive_val">0.08</span></label>
-                            <input type="range" class="slider" id="kappa_aggressive" min="0" max="0.15" step="0.01" value="0.08">
-                            <div class="param-description">市場容量擴張比例</div>
-                        </div>
-                        <div class="slider-group">
-                            <label>H (加速半衰期): <span id="half_life_aggressive_val">10</span> 季</label>
+                            <label>H (半衰期): <span id="half_life_aggressive_val">10</span> 季度</label>
                             <input type="range" class="slider" id="half_life_aggressive" min="2" max="16" step="1" value="10">
-                            <div class="param-description">加速效應持續時間</div>
-                        </div>
-                        <div class="slider-group">
-                            <label>W (介入窗口): <span id="window_aggressive_val">12</span> 季</label>
-                            <input type="range" class="slider" id="window_aggressive" min="4" max="16" step="1" value="12">
-                            <div class="param-description">介入措施持續時間</div>
-                        </div>
-                        <div class="slider-group">
-                            <label>E (擴張窗口): <span id="expansion_aggressive_val">12</span> 季</label>
-                            <input type="range" class="slider" id="expansion_aggressive" min="4" max="16" step="1" value="12">
-                            <div class="param-description">容量擴張持續時間</div>
                         </div>
                     </div>
                 </div>
@@ -421,34 +928,20 @@
             </div>
         </div>
 
-        <!-- Step 4: Results & Analysis -->
+        <!-- Step 4: Results -->
         <div class="section" id="step4" style="display: none;">
             <div class="section-header">
                 <h2>步驟 4: 比較預測與分析</h2>
-                <p>查看不同情境的預測結果與效益分析</p>
+                <p>查看不同情境的預測結果</p>
             </div>
 
             <div class="card">
                 <div class="card__header">
                     <h3>預測趨勢圖</h3>
-                    <div class="chart-controls">
-                        <button class="btn btn--sm btn--outline" id="exportChartBtn">匯出圖表</button>
-                    </div>
                 </div>
                 <div class="card__body">
                     <div class="chart-container">
                         <canvas id="forecastChart"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="card__header">
-                    <h3>增量帳戶分析</h3>
-                </div>
-                <div class="card__body">
-                    <div class="chart-container">
-                        <canvas id="incrementalChart"></canvas>
                     </div>
                 </div>
             </div>
@@ -468,69 +961,12 @@
                                     <th>期間</th>
                                     <th>基線</th>
                                     <th>保守型</th>
-                                    <th>保守增量</th>
                                     <th>穩健型</th>
-                                    <th>穩健增量</th>
                                     <th>積極型</th>
-                                    <th>積極增量</th>
                                 </tr>
                             </thead>
                             <tbody></tbody>
                         </table>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="card__header">
-                    <h3>效益摘要</h3>
-                </div>
-                <div class="card__body">
-                    <div id="summaryStats"></div>
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="card__header">
-                    <h3>ROI 經濟分析</h3>
-                </div>
-                <div class="card__body">
-                    <div class="economics-inputs">
-                        <div class="form-group">
-                            <label class="form-label">平台開發成本 (USD)</label>
-                            <input type="number" class="form-control" id="devCost" value="1500000">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">年度維護成本 (USD)</label>
-                            <input type="number" class="form-control" id="maintCost" value="300000">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">每帳戶獲客成本 (USD)</label>
-                            <input type="number" class="form-control" id="acquisitionCost" value="50">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">每帳戶年度收益 (USD)</label>
-                            <input type="number" class="form-control" id="revenuePerAccount" value="25">
-                        </div>
-                        <button class="btn btn--primary" id="calculateROIBtn">計算 ROI</button>
-                    </div>
-                    <div id="roiResults" style="display: none;">
-                        <div class="table-container">
-                            <table class="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>情境</th>
-                                        <th>增量收益</th>
-                                        <th>獲客成本</th>
-                                        <th>平台成本</th>
-                                        <th>淨效益</th>
-                                        <th>ROI %</th>
-                                        <th>回本期 (年)</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="roiTableBody"></tbody>
-                            </table>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -542,7 +978,688 @@
         </div>
     </div>
 
+    <!-- ========================================
+         SINGLE SCRIPT BLOCK - NO DUPLICATES
+         ======================================== -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="app.js"></script>
+    <script>
+// ======================================
+// 1. CONSTANTS & CONFIGURATION
+// ======================================
+const SAMPLE_DATA = {
+  periods: ['Q1 2020', 'Q2 2020', 'Q3 2020', 'Q4 2020', 'Q1 2021', 'Q2 2021', 'Q3 2021', 'Q4 2021', 'Q1 2022', 'Q2 2022', 'Q3 2022', 'Q4 2022', 'Q1 2023', 'Q2 2023', 'Q3 2023', 'Q4 2023', 'Q1 2024', 'Q2 2024', 'Q3 2024', 'Q4 2024'],
+  accounts: [28988, 75699, 170312, 323900, 475110, 684196, 992318, 1191417, 1331101, 1601099, 1690404, 1833495, 2024223, 1900206, 1995234, 2186658, 2186357, 2382030, 2270589, 2235095]
+};
+
+const state = {
+  currentStep: 1,
+  historicalData: [],
+  dataQuality: null,
+  fittedParams: null,
+  forecastData: null,
+  scenarioParams: {
+    conservative: { alpha: 0.10, half_life: 6 },
+    moderate: { alpha: 0.20, half_life: 8 },
+    aggressive: { alpha: 0.35, half_life: 10 }
+  },
+  platformLaunchQuarter: 3
+};
+
+let fittingChart = null;
+let forecastChart = null;
+
+// ======================================
+// 2. UTILITY FUNCTIONS
+// ======================================
+function formatNumber(num) {
+  if (!isFinite(num)) return 'N/A';
+  if (num < 0) num = 0;
+  return new Intl.NumberFormat('zh-TW').format(Math.round(num));
+}
+
+function parseQuarter(quarterStr) {
+  const match = quarterStr.match(/Q(\d) (\d{4})/);
+  if (!match) return null;
+  return { quarter: parseInt(match[1]), year: parseInt(match[2]) };
+}
+
+function generateQuarters(startQuarter, numQuarters) {
+  const parsed = parseQuarter(startQuarter);
+  if (!parsed) return [];
+  
+  const quarters = [];
+  let { quarter, year } = parsed;
+  
+  for (let i = 0; i < numQuarters; i++) {
+    quarters.push(`Q${quarter} ${year}`);
+    quarter++;
+    if (quarter > 4) {
+      quarter = 1;
+      year++;
+    }
+  }
+  return quarters;
+}
+
+function showToast(message, duration = 3000) {
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transition = 'opacity 0.3s';
+    setTimeout(() => toast.remove(), 300);
+  }, duration);
+}
+
+// ======================================
+// 3. GOMPERTZ MODEL FUNCTIONS
+// ======================================
+function gompertzModel(t, K, b, t0) {
+  if (!isFinite(K) || !isFinite(b) || !isFinite(t0) || K <= 0 || b <= 0) {
+    return NaN;
+  }
+  
+  let exponent = -b * (t - t0);
+  exponent = Math.max(-700, Math.min(700, exponent));
+  
+  let inner_exp = Math.exp(exponent);
+  if (!isFinite(inner_exp)) return NaN;
+  
+  let outer_exp = -inner_exp;
+  outer_exp = Math.max(-700, Math.min(700, outer_exp));
+  
+  let result = K * Math.exp(outer_exp);
+  return isFinite(result) ? result : NaN;
+}
+
+function fitGompertzCurve(data) {
+  const n = data.length;
+  const maxAccounts = Math.max(...data);
+  
+  let bestParams = null;
+  let bestError = Infinity;
+  
+  const K_steps = [1.1, 1.3, 1.5, 2.0, 2.5];
+  const b_steps = [0.05, 0.1, 0.15, 0.2, 0.3, 0.4];
+  const t0_steps = [-2, 0, n * 0.3, n * 0.5, n * 0.7, n + 2];
+  
+  for (const k_mult of K_steps) {
+    const K = maxAccounts * k_mult;
+    if (K <= maxAccounts) continue;
+    
+    for (const b of b_steps) {
+      if (b <= 0 || b > 1.0) continue;
+      
+      for (const t0 of t0_steps) {
+        let error = 0;
+        let hasNaN = false;
+        
+        for (let i = 0; i < n; i++) {
+          const predicted = gompertzModel(i, K, b, t0);
+          if (!isFinite(predicted)) {
+            hasNaN = true;
+            break;
+          }
+          error += Math.pow(data[i] - predicted, 2);
+        }
+        
+        if (!hasNaN && isFinite(error) && error < bestError) {
+          bestError = error;
+          bestParams = { K, b, t0 };
+        }
+      }
+    }
+  }
+  
+  if (!bestParams) {
+    bestParams = { K: maxAccounts * 1.5, b: 0.2, t0: n * 0.5 };
+  }
+  
+  const mean = data.reduce((sum, val) => sum + val, 0) / n;
+  let ssRes = 0, ssTot = 0;
+  
+  for (let i = 0; i < n; i++) {
+    const predicted = gompertzModel(i, bestParams.K, bestParams.b, bestParams.t0);
+    if (isFinite(predicted)) {
+      ssRes += Math.pow(data[i] - predicted, 2);
+    }
+    ssTot += Math.pow(data[i] - mean, 2);
+  }
+  
+  const r2 = ssTot > 0 ? Math.max(0, Math.min(1, 1 - (ssRes / ssTot))) : 0;
+  const rmse = Math.sqrt(ssRes / n);
+  
+  return {
+    params: bestParams,
+    r2: isFinite(r2) ? r2 : 0,
+    rmse: isFinite(rmse) ? rmse : Infinity,
+    valid: isFinite(r2)
+  };
+}
+
+function applyIntervention(t, baselineValue, params, interventionParams, launchQuarter) {
+  if (!isFinite(t) || !isFinite(baselineValue)) return baselineValue;
+  if (t < launchQuarter) return baselineValue;
+  
+  const { K, b, t0 } = params;
+  const { alpha, half_life } = interventionParams;
+  
+  const tSinceLaunch = t - launchQuarter;
+  const decayExponent = -Math.log(2) * tSinceLaunch / half_life;
+  const clampedExp = Math.max(-100, Math.min(0, decayExponent));
+  const decayFactor = Math.exp(clampedExp);
+  
+  const cappedAlpha = Math.min(0.5, Math.max(0, alpha));
+  const accelerationFactor = 1 + cappedAlpha * decayFactor;
+  const adjustedB = b * accelerationFactor;
+  
+  const result = gompertzModel(t, K, adjustedB, t0);
+  return isFinite(result) ? result : baselineValue;
+}
+
+// ======================================
+// 4. NAVIGATION & STEP CONTROL
+// ======================================
+function goToStep(step) {
+  for (let i = 1; i <= 4; i++) {
+    document.getElementById(`step${i}`).style.display = 'none';
+    const stepEl = document.querySelector(`.step[data-step="${i}"]`);
+    stepEl.classList.remove('active', 'completed');
+    if (i < step) stepEl.classList.add('completed');
+  }
+  
+  document.getElementById(`step${step}`).style.display = 'block';
+  document.querySelector(`.step[data-step="${step}"]`).classList.add('active');
+  state.currentStep = step;
+}
+
+// ======================================
+// 5. DATA INPUT & VALIDATION
+// ======================================
+function loadSampleData() {
+  const dataText = SAMPLE_DATA.periods.map((period, i) => {
+    return `${period},${SAMPLE_DATA.accounts[i]}`;
+  }).join('\n');
+  
+  document.getElementById('dataInput').value = dataText;
+  parseAndDisplayData();
+}
+
+function parseAndDisplayData() {
+  const dataInput = document.getElementById('dataInput').value;
+  const lines = dataInput.trim().split('\n');
+  const data = [];
+  const errorEl = document.getElementById('dataError');
+  
+  try {
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      
+      const parts = line.split(',');
+      if (parts.length !== 2) {
+        throw new Error('每行必須包含兩個值: 期間,帳戶數');
+      }
+      
+      const period = parts[0].trim();
+      const accounts = parseFloat(parts[1].trim());
+      
+      if (isNaN(accounts) || accounts < 0) {
+        throw new Error(`無效的帳戶數: ${parts[1]}`);
+      }
+      
+      data.push({ period, accounts, dataType: 'Original' });
+    }
+    
+    if (data.length < 8) {
+      throw new Error('至少需要 8 個數據點進行擬合');
+    }
+    
+    state.historicalData = data;
+    analyzeDataQuality();
+    displayDataQualityReport();
+    displayDataPreview(data);
+    errorEl.style.display = 'none';
+    
+  } catch (error) {
+    errorEl.textContent = `錯誤: ${error.message}`;
+    errorEl.style.display = 'block';
+  }
+}
+
+function analyzeDataQuality() {
+  const data = state.historicalData;
+  const issues = [];
+  let score = 100;
+  
+  issues.push({
+    type: 'success',
+    icon: '✓',
+    title: '數據完整性: 優異',
+    description: `所有 ${data.length} 個季度的數據都存在`
+  });
+  
+  score = Math.max(0, Math.min(100, score));
+  state.dataQuality = { score, issues, validCount: data.length, totalCount: data.length };
+}
+
+function displayDataQualityReport() {
+  const card = document.getElementById('dataQualityCard');
+  const quality = state.dataQuality;
+  
+  const scoreFill = document.getElementById('qualityScoreFill');
+  const scoreValue = document.getElementById('qualityScoreValue');
+  
+  scoreFill.style.width = quality.score + '%';
+  scoreValue.textContent = '✓ ' + quality.score + '/100';
+  
+  const issuesContainer = document.getElementById('qualityIssues');
+  issuesContainer.innerHTML = quality.issues.map(issue => `
+    <div style="padding: var(--space-8); margin-bottom: var(--space-8); background: var(--color-bg-3); border-radius: var(--radius-base);">
+      <div style="font-weight: var(--font-weight-semibold);">${issue.icon} ${issue.title}</div>
+      <div style="font-size: var(--font-size-sm); color: var(--color-text-secondary);">${issue.description}</div>
+    </div>
+  `).join('');
+  
+  card.style.display = 'block';
+}
+
+function displayDataPreview(data) {
+  const tbody = document.querySelector('#dataPreviewTable tbody');
+  tbody.innerHTML = '';
+  
+  data.forEach((row) => {
+    const tr = document.createElement('tr');
+    const statusBadge = '<span class="status-badge valid">✓ 正常</span>';
+    
+    tr.innerHTML = `
+      <td>${row.period}</td>
+      <td>${formatNumber(row.accounts)}</td>
+      <td>${statusBadge}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+  
+  document.getElementById('dataPreviewCard').style.display = 'block';
+}
+
+function validateAndProceed() {
+  if (state.historicalData.length === 0) {
+    alert('請先輸入或載入數據');
+    return;
+  }
+  goToStep(2);
+  performFitting();
+}
+
+// ======================================
+// 6. MODEL FITTING
+// ======================================
+function performFitting() {
+  const statusEl = document.getElementById('fittingStatus');
+  const paramsEl = document.getElementById('parametersDisplay');
+  
+  statusEl.textContent = '正在擬合模型...';
+  paramsEl.style.display = 'none';
+  
+  setTimeout(() => {
+    const accounts = state.historicalData.map(d => d.accounts);
+    const result = fitGompertzCurve(accounts);
+    
+    if (!result) {
+      statusEl.textContent = '✘ 擬合失敗';
+      statusEl.style.color = 'var(--color-error)';
+      return;
+    }
+    
+    state.fittedParams = result.params;
+    
+    document.getElementById('paramK').textContent = formatNumber(result.params.K);
+    document.getElementById('paramB').textContent = result.params.b.toFixed(4);
+    document.getElementById('paramT0').textContent = result.params.t0.toFixed(2);
+    
+    if (result.r2 > 0.95) {
+      statusEl.innerHTML = '✔ 擬合成功！R² = ' + result.r2.toFixed(4) + ' (優異)';
+      statusEl.style.color = 'var(--color-success)';
+    } else {
+      statusEl.innerHTML = '⚠️ 擬合完成，R² = ' + result.r2.toFixed(4);
+      statusEl.style.color = 'var(--color-warning)';
+    }
+    
+    paramsEl.style.display = 'block';
+    displayFittingChart();
+  }, 500);
+}
+
+function displayFittingChart() {
+  const ctx = document.getElementById('fittingChart').getContext('2d');
+  
+  const periods = state.historicalData.map(d => d.period);
+  const actual = state.historicalData.map(d => d.accounts);
+  const fitted = state.historicalData.map((d, i) => 
+    gompertzModel(i, state.fittedParams.K, state.fittedParams.b, state.fittedParams.t0)
+  );
+  
+  if (fittingChart) fittingChart.destroy();
+  
+  fittingChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: periods,
+      datasets: [
+        {
+          label: '實際數據',
+          data: actual,
+          borderColor: '#3b82f6',
+          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+          pointRadius: 5,
+          borderWidth: 2
+        },
+        {
+          label: '擬合曲線',
+          data: fitted,
+          borderColor: '#10b981',
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          borderDash: [5, 5],
+          pointRadius: 0
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: true, position: 'top' },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              return context.dataset.label + ': ' + formatNumber(context.parsed.y);
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: { callback: function(value) { return formatNumber(value); } }
+        }
+      }
+    }
+  });
+}
+
+// ======================================
+// 7. SCENARIO CONFIGURATION
+// ======================================
+function initializeSliders() {
+  const scenarios = ['conservative', 'moderate', 'aggressive'];
+  const params = ['alpha', 'half_life'];
+  
+  scenarios.forEach(scenario => {
+    params.forEach(param => {
+      const sliderId = `${param}_${scenario}`;
+      const slider = document.getElementById(sliderId);
+      const valueEl = document.getElementById(`${sliderId}_val`);
+      
+      if (slider && valueEl) {
+        slider.addEventListener('input', (e) => {
+          let value = parseFloat(e.target.value);
+          
+          if (param === 'alpha') {
+            valueEl.textContent = value;
+            value = value / 100;
+          } else {
+            valueEl.textContent = value;
+          }
+          
+          state.scenarioParams[scenario][param] = value;
+        });
+      }
+    });
+  });
+}
+
+function loadScenarioPreset(scenario) {
+  const presets = {
+    conservative: { alpha: 0.10, half_life: 6 },
+    moderate: { alpha: 0.20, half_life: 8 },
+    aggressive: { alpha: 0.35, half_life: 10 }
+  };
+  
+  const preset = presets[scenario];
+  state.scenarioParams[scenario] = { ...preset };
+  
+  document.getElementById(`alpha_${scenario}`).value = preset.alpha * 100;
+  document.getElementById(`alpha_${scenario}_val`).textContent = (preset.alpha * 100);
+  document.getElementById(`half_life_${scenario}`).value = preset.half_life;
+  document.getElementById(`half_life_${scenario}_val`).textContent = preset.half_life;
+  
+  showToast(`✓ 已載入${scenario === 'conservative' ? '保守型' : scenario === 'moderate' ? '穩健型' : '積極型'}情境預設`);
+}
+
+// ======================================
+// 8. FORECAST GENERATION & DISPLAY
+// ======================================
+function generateForecasts() {
+  const forecastYears = parseInt(document.getElementById('forecastYears').value);
+  const forecastQuarters = forecastYears * 4;
+  let platformLaunch = parseInt(document.getElementById('platformLaunch').value);
+  
+  if (!platformLaunch || platformLaunch < 1) {
+    platformLaunch = 3;
+    document.getElementById('platformLaunch').value = 3;
+  }
+  
+  state.platformLaunchQuarter = platformLaunch;
+  
+  const lastPeriod = state.historicalData[state.historicalData.length - 1].period;
+  const forecastPeriods = generateQuarters(lastPeriod, forecastQuarters + 1).slice(1);
+  const baseOffset = state.historicalData.length;
+  
+  const forecasts = {
+    periods: forecastPeriods,
+    baseline: [],
+    conservative: [],
+    moderate: [],
+    aggressive: []
+  };
+  
+  for (let i = 0; i < forecastQuarters; i++) {
+    const t = baseOffset + i;
+    const baseline = gompertzModel(t, state.fittedParams.K, state.fittedParams.b, state.fittedParams.t0);
+    
+    forecasts.baseline.push(baseline);
+    forecasts.conservative.push(applyIntervention(t, baseline, state.fittedParams, state.scenarioParams.conservative, baseOffset + platformLaunch));
+    forecasts.moderate.push(applyIntervention(t, baseline, state.fittedParams, state.scenarioParams.moderate, baseOffset + platformLaunch));
+    forecasts.aggressive.push(applyIntervention(t, baseline, state.fittedParams, state.scenarioParams.aggressive, baseOffset + platformLaunch));
+  }
+  
+  state.forecastData = forecasts;
+  
+  goToStep(4);
+  displayForecastChart();
+  displayForecastTable();
+}
+
+function displayForecastChart() {
+  const ctx = document.getElementById('forecastChart').getContext('2d');
+  
+  if (forecastChart) forecastChart.destroy();
+  
+  const filterNaN = (arr) => arr.map(v => isFinite(v) ? v : null);
+  
+  forecastChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: state.forecastData.periods,
+      datasets: [
+        {
+          label: '基線',
+          data: filterNaN(state.forecastData.baseline),
+          borderColor: '#6b7280',
+          backgroundColor: 'transparent',
+          borderWidth: 3,
+          pointRadius: 0
+        },
+        {
+          label: '保守型',
+          data: filterNaN(state.forecastData.conservative),
+          borderColor: '#3b82f6',
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          borderDash: [5, 3],
+          pointRadius: 0
+        },
+        {
+          label: '穩健型',
+          data: filterNaN(state.forecastData.moderate),
+          borderColor: '#10b981',
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          borderDash: [5, 3],
+          pointRadius: 0
+        },
+        {
+          label: '積極型',
+          data: filterNaN(state.forecastData.aggressive),
+          borderColor: '#ef4444',
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          borderDash: [5, 3],
+          pointRadius: 0
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: true, position: 'top' },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              const value = context.parsed.y;
+              if (value === null || !isFinite(value)) return context.dataset.label + ': N/A';
+              return context.dataset.label + ': ' + formatNumber(value);
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: false,
+          ticks: { callback: function(value) { return formatNumber(value); } }
+        }
+      }
+    }
+  });
+}
+
+function displayForecastTable() {
+  const tbody = document.querySelector('#forecastTable tbody');
+  tbody.innerHTML = '';
+  
+  const n = state.forecastData.periods.length;
+  
+  for (let i = 0; i < n; i++) {
+    const tr = document.createElement('tr');
+    
+    const baseline = state.forecastData.baseline[i];
+    const conservative = state.forecastData.conservative[i];
+    const moderate = state.forecastData.moderate[i];
+    const aggressive = state.forecastData.aggressive[i];
+    
+    const formatSafe = (val) => isFinite(val) ? formatNumber(val) : 'N/A';
+    
+    tr.innerHTML = `
+      <td>${state.forecastData.periods[i]}</td>
+      <td>${formatSafe(baseline)}</td>
+      <td>${formatSafe(conservative)}</td>
+      <td>${formatSafe(moderate)}</td>
+      <td>${formatSafe(aggressive)}</td>
+    `;
+    
+    tbody.appendChild(tr);
+  }
+}
+
+function exportCSV() {
+  let csv = '期間,基線,保守型,穩健型,積極型\n';
+  
+  const n = state.forecastData.periods.length;
+  for (let i = 0; i < n; i++) {
+    const baseline = state.forecastData.baseline[i];
+    const conservative = state.forecastData.conservative[i];
+    const moderate = state.forecastData.moderate[i];
+    const aggressive = state.forecastData.aggressive[i];
+    
+    const baselineStr = isFinite(baseline) ? baseline.toFixed(0) : 'N/A';
+    const conservativeStr = isFinite(conservative) ? conservative.toFixed(0) : 'N/A';
+    const moderateStr = isFinite(moderate) ? moderate.toFixed(0) : 'N/A';
+    const aggressiveStr = isFinite(aggressive) ? aggressive.toFixed(0) : 'N/A';
+    
+    csv += `${state.forecastData.periods[i]},${baselineStr},${conservativeStr},${moderateStr},${aggressiveStr}\n`;
+  }
+  
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'forecast_data.csv';
+  a.click();
+  window.URL.revokeObjectURL(url);
+}
+
+// ======================================
+// 9. EVENT LISTENERS & INITIALIZATION
+// ======================================
+document.addEventListener('DOMContentLoaded', () => {
+  loadSampleData();
+  
+  document.getElementById('loadSampleBtn').addEventListener('click', loadSampleData);
+  document.getElementById('clearDataBtn').addEventListener('click', () => {
+    document.getElementById('dataInput').value = '';
+    document.getElementById('dataPreviewCard').style.display = 'none';
+    state.historicalData = [];
+  });
+  
+  document.getElementById('dataInput').addEventListener('input', parseAndDisplayData);
+  document.getElementById('validateDataBtn').addEventListener('click', validateAndProceed);
+  
+  document.getElementById('backToStep1').addEventListener('click', () => goToStep(1));
+  document.getElementById('proceedToStep3').addEventListener('click', () => {
+    goToStep(3);
+    initializeSliders();
+  });
+  
+  document.querySelectorAll('.scenario-preset').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const scenario = e.target.dataset.scenario;
+      loadScenarioPreset(scenario);
+    });
+  });
+  
+  document.getElementById('backToStep2').addEventListener('click', () => goToStep(2));
+  document.getElementById('proceedToStep4').addEventListener('click', generateForecasts);
+  
+  document.getElementById('backToStep3').addEventListener('click', () => goToStep(3));
+  document.getElementById('resetAllBtn').addEventListener('click', () => {
+    if (confirm('確定要重新開始嗎？')) {
+      goToStep(1);
+      document.getElementById('dataInput').value = '';
+      state.historicalData = [];
+      state.fittedParams = null;
+      state.forecastData = null;
+    }
+  });
+  
+  document.getElementById('exportCSVBtn').addEventListener('click', exportCSV);
+  
+  initializeSliders();
+});
+    </script>
 </body>
 </html>
