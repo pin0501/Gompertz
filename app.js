@@ -2079,8 +2079,10 @@ function forwardFill(data, index) {
 // Event listeners
 document.addEventListener('DOMContentLoaded', () => {
   // Load sample data on page load
-  loadSampleData();
-  
+  // loadSampleData(); // <--- 像這樣註解掉
+
+  // Step 1 events
+  document.getElementById('loadSampleBtn').addEventListener('click', loadSampleData);
   // Interpolation method change listener
   document.querySelectorAll('input[name="interpolation"]').forEach(radio => {
     radio.addEventListener('change', (e) => {
