@@ -2191,4 +2191,5 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Set initial chart view
   state.currentChartView = 'absolute';
-});
+}); // Closing brace for the DOMContentLoaded event listener
+} // Closing brace for the last function or block
