@@ -1447,6 +1447,80 @@ function displayDataQualityReport() {
   // --- 新增結束 ---
 }
 
+function displayDataPreview(data) {
+  const tbody = document.querySelector('#dataPreviewTable tbody');
+  tbody.innerHTML = '';
+  
+  data.forEach((row, index) => {
+    const tr = document.createElement('tr');
+    
+    // Determine row status
+    let statusClass = 'status-valid';
+    let statusBadge = '<span class="status-badge valid">✓ 正常</span>';
+    let outlierBadge = '-';
+    let recommendation = '無需處理';
+    let actions = '-';
+    
+    if (row.isMissing) {
+      statusClass = 'status-missing';
+      statusBadge = '<span class="status-badge missing">⚠️ 缺漏</span>';
+      recommendation = '建議插值';
+      actions = '<button class="btn btn--sm btn--outline" onclick="editCell(' + index + ')">手動輸入</button>';
+    } else if (row.dataType === 'Interpolated') {
+      statusClass = 'status-interpolated';
+      statusBadge = '<span class.status-badge.interpolated">📊 已插值</span>';
+      recommendation = '已處理';
+      actions = '<button class="btn btn--sm btn--outline" onclick="editCell(' + index + ')">修改</button>';
+    } else if (row.isOutlier) {
+      statusClass = 'status-outlier';
+      outlierBadge = '<span class="status-badge outlier">⚠️ 異常</span>';
+      recommendation = '請確認數據';
+      actions = '<button class="btn btn--sm btn--outline" onclick="confirmCell(' + index + ')">確認無誤</button>';
+    }
+    
+    const valueDisplay = row.isMissing ? '<em style="color: var(--color-text-secondary);">缺漏</em>' : formatNumber(row.accounts);
+    
+    tr.className = statusClass;
+    tr.innerHTML = `
+      <td>${row.period}</td>
+      <td>${valueDisplay}</td>
+      <td>${statusBadge}</td>
+      <td>${outlierBadge}</td>
+      <td style="font-size: var(--font-size-sm);">${recommendation}</td>
+      <td class="cell-actions">${actions}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+  
+  document.getElementById('dataPreviewCard').style.display = 'block';
+}
+
+// Cell editing functions
+function editCell(index) {
+  const value = prompt('請輸入帳戶數:', state.historicalData[index].accounts || '');
+  if (value !== null) {
+    const accounts = parseFloat(value);
+    if (!isNaN(accounts) && accounts >= 0) {
+      state.historicalData[index].accounts = accounts;
+      state.historicalData[index].isMissing = false;
+      state.historicalData[index].dataType = 'Corrected';
+      analyzeDataQuality();
+      displayDataQualityReport();
+      displayDataPreview(state.historicalData);
+    } else {
+      alert('請輸入有效的數字');
+    }
+  }
+}
+
+function confirmCell(index) {
+  state.historicalData[index].isOutlier = false;
+  state.historicalData[index].dataType = 'Confirmed';
+  analyzeDataQuality();
+  displayDataQualityReport();
+  displayDataPreview(state.historicalData);
+}
+
 function validateAndProceed() {
   if (state.historicalData.length === 0) {
     alert('請先輸入或載入數據');
