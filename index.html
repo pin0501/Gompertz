@@ -1019,6 +1019,10 @@ textarea.form-control {
                             <label>κ (TAM 擴張): <span id="kappa_conservative_val">2</span>%</label>
                             <input type="range" class="slider" id="kappa_conservative" min="0" max="20" step="1" value="2">
                         </div>
+                        <div class="slider-group">
+                            <label>P (效應高峰): <span id="peak_quarter_conservative_val">4</span> 季度後</label>
+                            <input type="range" class="slider" id="peak_quarter_conservative" min="1" max="12" step="1" value="4">
+                        </div>
                     </div>
                 </div>
 
@@ -1041,6 +1045,10 @@ textarea.form-control {
                             <label>κ (TAM 擴張): <span id="kappa_moderate_val">5</span>%</label>
                             <input type="range" class="slider" id="kappa_moderate" min="0" max="20" step="1" value="5">
                         </div>
+                        <div class="slider-group">
+                            <label>P (效應高峰): <span id="peak_quarter_moderate_val">6</span> 季度後</label>
+                            <input type="range" class="slider" id="peak_quarter_moderate" min="1" max="12" step="1" value="6">
+                        </div>
                     </div>
                 </div>
 
@@ -1062,6 +1070,10 @@ textarea.form-control {
                         <div class="slider-group">
                             <label>κ (TAM 擴張): <span id="kappa_aggressive_val">8</span>%</label>
                             <input type="range" class="slider" id="kappa_aggressive" min="0" max="20" step="1" value="8">
+                        </div>
+                        <div class="slider-group">
+                            <label>P (效應高峰): <span id="peak_quarter_aggressive_val">8</span> 季度後</label>
+                            <input type="range" class="slider" id="peak_quarter_aggressive" min="1" max="12" step="1" value="8">
                         </div>
                     </div>
                 </div>
@@ -1153,9 +1165,9 @@ const state = {
   fittedParams: null,
   forecastData: null,
   scenarioParams: {
-    conservative: { alpha: 0.10, delta_t: 0.5, kappa: 0.02, half_life: 6, window_length: 6, expansion_length: 8 },
-    moderate: { alpha: 0.20, delta_t: 1.0, kappa: 0.05, half_life: 8, window_length: 8, expansion_length: 10 },
-    aggressive: { alpha: 0.35, delta_t: 1.5, kappa: 0.08, half_life: 10, window_length: 12, expansion_length: 12 }
+    conservative: { alpha: 0.10, delta_t: 0.5, kappa: 0.02, half_life: 6, peak_quarter: 4 },
+    moderate: { alpha: 0.20, delta_t: 1.0, kappa: 0.05, half_life: 8, peak_quarter: 6 },
+    aggressive: { alpha: 0.35, delta_t: 1.5, kappa: 0.08, half_life: 10, peak_quarter: 8 }
   },
   platformLaunchQuarter: 3,
   interpolationMethod: 'ignore', // <-- 新增這一行
@@ -1422,27 +1434,36 @@ function applyIntervention(t, baselineValue, params, interventionParams, launchQ
   if (t < launchQuarter) return baselineValue;
 
   const { K, b, t0 } = params;
-  // 從 state 讀取完整的參數 (注意：我們只用這四個)
-  const { alpha, delta_t, kappa, half_life } = interventionParams;
+  // --- (新) 取得 peak_quarter 參數 ---
+  const { alpha, delta_t, kappa, half_life, peak_quarter } = interventionParams;
   const tSinceLaunch = t - launchQuarter;
   
-  // --- 1. 成長率加速 (b) ---
-  const decayExponent = -Math.log(2) * tSinceLaunch / half_life;
-  const clampedExp = Math.max(-100, Math.min(0, decayExponent));
-  const decayFactor = Math.exp(clampedExp);
+  // --- (新) 邏輯: 爬升 (Ramp-up) + 衰減 (Decay) ---
+  let effectFactor = 0;
+  if (tSinceLaunch < peak_quarter) {
+    // 1. 爬升期: 從 0 線性爬升到 1 (在 peak_quarter 達到 1)
+    // 我們使用 (t+1)/(P+1) 來避免 t=0, P=0 的情況
+    effectFactor = (tSinceLaunch + 1) / (peak_quarter + 1);
+  } else {
+    // 2. 衰減期: 從 peak_quarter 開始，使用半衰期 H 進行指數衰減
+    const tSincePeak = tSinceLaunch - peak_quarter;
+    const decayExponent = -Math.log(2) * tSincePeak / half_life;
+    const clampedExp = Math.max(-100, Math.min(0, decayExponent));
+    effectFactor = Math.exp(clampedExp); // 在 peak_quarter 時, tSincePeak=0, effectFactor=1
+  }
+  
   const cappedAlpha = Math.min(0.5, Math.max(0, alpha));
-  const accelerationFactor = 1 + cappedAlpha * decayFactor;
+  const accelerationFactor = 1 + cappedAlpha * effectFactor; // 套用效應
   
   // --- 2. 上限擴張 (K) ---
-  // 為了簡化，我們使用與 b 相同的衰減函數來平滑過渡 K
-  // 這樣 K 會平滑地從 K 增長到 K * (1 + kappa)
+  // 為了簡化，我們讓 K 和 t0 的效應也跟隨 P 和 H 的曲線
   const cappedKappa = Math.min(0.2, Math.max(0, kappa));
-  const expansionSmoother = 1 - decayFactor; // 當 t 很大時，decayFactor -> 0, smoother -> 1
+  const expansionSmoother = effectFactor; // (舊: 1 - decayFactor)
   const capacityFactor = 1 + cappedKappa * expansionSmoother;
   
   // --- 3. 拐點前移 (t0) ---
   const cappedDeltaT = Math.min(5, Math.max(0, delta_t));
-  const shiftSmoother = 1 - decayFactor; // 同上，平滑地前移
+  const shiftSmoother = effectFactor; // (舊: 1 - decayFactor)
   const adjustedT0_shift = cappedDeltaT * shiftSmoother;
   
   // --- 組合參數 ---
@@ -2067,8 +2088,8 @@ function forwardFill(data, index) {
 // ======================================
 function initializeSliders() {
   const scenarios = ['conservative', 'moderate', 'aggressive'];
-  // 新增 delta_t 和 kappa
-  const params = ['alpha', 'half_life', 'delta_t', 'kappa'];
+  // --- (新) 新增 'peak_quarter' ---
+  const params = ['alpha', 'half_life', 'delta_t', 'kappa', 'peak_quarter'];
   
   scenarios.forEach(scenario => {
     params.forEach(param => {
@@ -2079,13 +2100,12 @@ function initializeSliders() {
       if (slider && valueEl) {
         slider.addEventListener('input', (e) => {
           let value = parseFloat(e.target.value);
-          let displayValue = value;
           
           if (param === 'alpha' || param === 'kappa') {
             valueEl.textContent = value; // 顯示 10, 2
             value = value / 100; // 儲存 0.1, 0.02
           } else {
-            valueEl.textContent = value; // 顯示 6, 0.5
+            valueEl.textContent = value; // 顯示 6, 0.5, 4
           }
           
           state.scenarioParams[scenario][param] = value;
@@ -2097,21 +2117,23 @@ function initializeSliders() {
 
 function loadScenarioPreset(scenario) {
   const presets = {
-    conservative: { alpha: 0.10, delta_t: 0.5, kappa: 0.02, half_life: 6 },
-    moderate: { alpha: 0.20, delta_t: 1.0, kappa: 0.05, half_life: 8 },
-    aggressive: { alpha: 0.35, delta_t: 1.5, kappa: 0.08, half_life: 10 }
+    // --- (新) 新增 'peak_quarter' 預設值 ---
+    conservative: { alpha: 0.10, delta_t: 0.5, kappa: 0.02, half_life: 6, peak_quarter: 4 },
+    moderate: { alpha: 0.20, delta_t: 1.0, kappa: 0.05, half_life: 8, peak_quarter: 6 },
+    aggressive: { alpha: 0.35, delta_t: 1.5, kappa: 0.08, half_life: 10, peak_quarter: 8 }
   };
   
   const preset = presets[scenario];
-  // 更新 state (我們只更新這四個)
+  // 更新 state (我們只更新這五個)
   state.scenarioParams[scenario] = { 
     alpha: preset.alpha, 
     half_life: preset.half_life, 
     delta_t: preset.delta_t, 
-    kappa: preset.kappa 
+    kappa: preset.kappa,
+    peak_quarter: preset.peak_quarter // (新)
   };
   
-  // 更新所有四個滑桿的值
+  // 更新所有五個滑桿的值
   document.getElementById(`alpha_${scenario}`).value = preset.alpha * 100;
   document.getElementById(`alpha_${scenario}_val`).textContent = (preset.alpha * 100);
   
@@ -2123,6 +2145,10 @@ function loadScenarioPreset(scenario) {
   
   document.getElementById(`kappa_${scenario}`).value = preset.kappa * 100;
   document.getElementById(`kappa_${scenario}_val`).textContent = (preset.kappa * 100);
+
+  // --- (新) 更新 peak_quarter 滑桿 ---
+  document.getElementById(`peak_quarter_${scenario}`).value = preset.peak_quarter;
+  document.getElementById(`peak_quarter_${scenario}_val`).textContent = preset.peak_quarter;
   
   showToast(`✓ 已載入${scenario === 'conservative' ? '保守型' : scenario === 'moderate' ? '穩健型' : '積極型'}情境預設`);
 }
