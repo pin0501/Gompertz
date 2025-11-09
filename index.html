@@ -1824,18 +1824,37 @@ function displayFittingChart() {
       const newK = parseFloat(document.getElementById('inputParamK').value);
       const newB = parseFloat(document.getElementById('inputParamB').value);
       const newT0 = parseFloat(document.getElementById('inputParamT0').value);
-
+  
       if (!isFinite(newK) || !isFinite(newB) || !isFinite(newT0)) {
         return; // 如果輸入無效 (例如空的)，則不更新
       }
       
-      // 僅更新 state 和圖表
+      // 1. 更新 state
       state.fittedParams.K = newK;
       state.fittedParams.b = newB;
       state.fittedParams.t0 = newT0;
+  
+      // 2. 重畫圖表
       displayFittingChart();
       
+      // --- 3. (新) 重新計算 R² 並更新狀態 ---
+      const validData = state.historicalData.filter(d => !d.isMissing).map(d => d.accounts);
+      const newR2 = calculateR2(validData, state.fittedParams);
+      const statusEl = document.getElementById('fittingStatus');
+      
+      // 更新狀態文字，標記為手動調整
+      statusEl.innerHTML = `⚠️ 手動調整模式 (R² = ${newR2.toFixed(4)})`;
+      if (newR2 > 0.9) {
+         statusEl.style.color = 'var(--color-success)';
+      } else if (newR2 > 0.8) {
+         statusEl.style.color = 'var(--color-warning)';
+      } else {
+         statusEl.style.color = 'var(--color-error)';
+      }
+      // --- 新增結束 ---
+      
     } catch (e) {
+      // 如果解析失敗則不執行
       console.error("Error updating manual params:", e);
     }
   }
