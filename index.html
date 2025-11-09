@@ -1464,25 +1464,25 @@ function applyIntervention(t, baselineValue, params, interventionParams, launchQ
   const tSinceLaunch = t - launchQuarter;
   
   // --- 1. 臨時效應因子 (用於 alpha, delta_t) ---
-  // 這個因子會爬升到高峰，然後根據半衰期 H "衰減"
   let temporaryEffectFactor = 0;
   if (tSinceLaunch < peak_quarter) {
-    // 爬升期: 從 0 線性爬升到 1
-    temporaryEffectFactor = (tSinceLaunch + 1) / (peak_quarter + 1);
+    // --- (新) 修正：使用 "平滑緩入 (Sine Ease-In)" 取代 "線性" ---
+    // 這會模擬一個 "開始慢，然後加速" 的爬升，更符合真實採用行為
+    temporaryEffectFactor = 0.5 * (1 - Math.cos(Math.PI * tSinceLaunch / peak_quarter));
+    
   } else {
     // 衰減期: 從 peak_quarter 開始，使用 H 衰減
     const tSincePeak = tSinceLaunch - peak_quarter;
     const decayExponent = -Math.log(2) * tSincePeak / half_life;
     const clampedExp = Math.max(-100, Math.min(0, decayExponent));
-    temporaryEffectFactor = Math.exp(clampedExp); // 在 peak_quarter 時 = 1
+    temporaryEffectFactor = Math.exp(clampedExp); 
   }
   
   // --- 2. 永久效應因子 (用於 kappa) ---
-  // 這個因子會爬升到高峰，然後 "保持" 在 1
   let permanentEffectFactor = 0;
   if (tSinceLaunch < peak_quarter) {
-    // 爬升期: 從 0 線性爬升到 1
-    permanentEffectFactor = (tSinceLaunch + 1) / (peak_quarter + 1);
+    // --- (新) 修正：這裡也使用 "平滑緩入" ---
+    permanentEffectFactor = 0.5 * (1 - Math.cos(Math.PI * tSinceLaunch / peak_quarter));
   } else {
     // 保持期: 永遠保持在 1
     permanentEffectFactor = 1; 
@@ -1508,8 +1508,6 @@ function applyIntervention(t, baselineValue, params, interventionParams, launchQ
 
   const result = gompertzModel(t, adjustedK, adjustedB, adjustedT0);
   
-  // (註: 我們保留 generateForecasts 中的 Math.max(0,...) 作為最後的保險)
-  // 但這裡的 baselineValue 參數是用於防止介入曲線低於基線 *總數*
   return isFinite(result) ? Math.max(baselineValue, result) : baselineValue;
 }
 
