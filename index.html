@@ -2187,6 +2187,7 @@ function generateForecasts() {
   
   goToStep(4);
   displayForecastChart();
+  displayIncrementalChart(); // <-- 這是新增的呼叫
   displayForecastTable();
 }
 
@@ -2282,7 +2283,7 @@ function displayForecastChart() {
       }
     }
   });
-}
+} // displayForecastChart 結束的 }
 
 // --- 新增：增量效益直方圖 ---
 function displayIncrementalChart() {
@@ -2414,7 +2415,8 @@ function displayForecastTable() {
 }
 
 function exportCSV() {
-  let csv = '期間,基線,保守型,穩健型,積極型\n';
+  // --- 修改：新增增量欄位 ---
+  let csv = '期間,基線,保守型,保守增量,穩健型,穩健增量,積極型,積極增量\n';
   
   const n = state.forecastData.periods.length;
   for (let i = 0; i < n; i++) {
@@ -2423,15 +2425,27 @@ function exportCSV() {
     const moderate = state.forecastData.moderate[i];
     const aggressive = state.forecastData.aggressive[i];
     
+    // --- (新) 計算增量 ---
+    const consIncr = (isFinite(conservative) && isFinite(baseline)) ? (conservative - baseline) : NaN;
+    const modIncr = (isFinite(moderate) && isFinite(baseline)) ? (moderate - baseline) : NaN;
+    const aggIncr = (isFinite(aggressive) && isFinite(baseline)) ? (aggressive - baseline) : NaN;
+    
+    // --- 修改：格式化所有值 ---
     const baselineStr = isFinite(baseline) ? baseline.toFixed(0) : 'N/A';
     const conservativeStr = isFinite(conservative) ? conservative.toFixed(0) : 'N/A';
     const moderateStr = isFinite(moderate) ? moderate.toFixed(0) : 'N/A';
     const aggressiveStr = isFinite(aggressive) ? aggressive.toFixed(0) : 'N/A';
+    const consIncrStr = isFinite(consIncr) ? consIncr.toFixed(0) : 'N/A';
+    const modIncrStr = isFinite(modIncr) ? modIncr.toFixed(0) : 'N/A';
+    const aggIncrStr = isFinite(aggIncr) ? aggIncr.toFixed(0) : 'N/A';
     
-    csv += `${state.forecastData.periods[i]},${baselineStr},${conservativeStr},${moderateStr},${aggressiveStr}\n`;
+    // --- 修改：新增增量欄位到 CSV ---
+    csv += `${state.forecastData.periods[i]},${baselineStr},${conservativeStr},${consIncrStr},${moderateStr},${modIncrStr},${aggressiveStr},${aggIncrStr}\n`;
   }
   
-  const blob = new Blob([csv], { type: 'text/csv' });
+  // 加上 UTF-8 BOM 確保 Excel 能正確開啟中文
+  const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+  const blob = new Blob([bom, csv], { type: 'text/csv;charset=utf-8,' });
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
