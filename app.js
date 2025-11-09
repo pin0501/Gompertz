@@ -13,9 +13,9 @@ const state = {
   forecastData: null,
   scenarios: ['conservative', 'moderate', 'aggressive'],
   scenarioParams: {
-    conservative: { alpha: 0.10, delta_t: 0.5, kappa: 0.02, half_life: 6, window_length: 6, expansion_length: 8 },
-    moderate: { alpha: 0.20, delta_t: 1.0, kappa: 0.05, half_life: 8, window_length: 8, expansion_length: 10 },
-    aggressive: { alpha: 0.35, delta_t: 1.5, kappa: 0.08, half_life: 10, window_length: 12, expansion_length: 12 }
+    conservative: { alpha: 0.10, delta_t: 0.5, kappa: 0.02, half_life: 6, peak_quarter: 4 },
+    moderate: { alpha: 0.20, delta_t: 1.0, kappa: 0.05, half_life: 8, peak_quarter: 6 },
+    aggressive: { alpha: 0.35, delta_t: 1.5, kappa: 0.08, half_life: 10, peak_quarter: 8 }
   },
   platformLaunchQuarter: 1,
   interpolationMethod: 'ignore'
@@ -285,93 +285,50 @@ function fitGompertzCurve(data) {
 }
 
 function applyIntervention(t, baselineValue, params, interventionParams, launchQuarter) {
-  // Validate inputs
-  if (!isFinite(t) || !isFinite(baselineValue)) {
-    console.warn('Invalid intervention inputs:', { t, baselineValue });
-    return baselineValue;
-  }
-  
+  if (!isFinite(t) || !isFinite(baselineValue)) return baselineValue;
+  if (t < launchQuarter) return baselineValue;
+
   const { K, b, t0 } = params;
-  const { alpha, delta_t, kappa, half_life, window_length, expansion_length } = interventionParams;
-  
-  // Validate parameters
-  if (!isFinite(K) || !isFinite(b) || !isFinite(t0)) {
-    console.warn('Invalid params in intervention:', params);
-    return baselineValue;
-  }
-  
-  if (t < launchQuarter) {
-    return baselineValue;
-  }
-  
+  // --- (新) 取得 peak_quarter 參數 ---
+  const { alpha, delta_t, kappa, half_life, peak_quarter } = interventionParams;
   const tSinceLaunch = t - launchQuarter;
   
-  // Growth acceleration with exponential decay (with safety bounds)
-  let accelerationFactor = 1;
-  if (tSinceLaunch < window_length) {
-    const decayExponent = -Math.log(2) * tSinceLaunch / half_life;
-    // Clamp decay exponent
-    const clampedExp = Math.max(-100, Math.min(0, decayExponent));
-    const decayFactor = Math.exp(clampedExp);
-    
-    if (!isFinite(decayFactor)) {
-      console.warn('Invalid decay factor at t=' + t);
-      accelerationFactor = 1;
-    } else {
-      // Cap alpha effect
-      const cappedAlpha = Math.min(0.5, Math.max(0, alpha));
-      accelerationFactor = 1 + cappedAlpha * decayFactor;
-    }
-  }
-  
-  // TAM expansion with smooth transition (with safety bounds)
-  let capacityFactor = 1;
-  if (tSinceLaunch < expansion_length) {
-    const expansionProgress = tSinceLaunch / expansion_length;
-    const expansionExp = -3 * expansionProgress;
-    // Clamp expansion exponent
-    const clampedExpansion = Math.max(-100, Math.min(0, expansionExp));
-    const expansionSmoother = 1 - Math.exp(clampedExpansion);
-    
-    if (!isFinite(expansionSmoother)) {
-      console.warn('Invalid expansion smoother at t=' + t);
-      capacityFactor = 1;
-    } else {
-      // Cap kappa effect
-      const cappedKappa = Math.min(0.2, Math.max(0, kappa));
-      capacityFactor = 1 + cappedKappa * expansionSmoother;
-    }
+  // --- (新) 邏輯: 爬升 (Ramp-up) + 衰減 (Decay) ---
+  let effectFactor = 0;
+  if (tSinceLaunch < peak_quarter) {
+    // 1. 爬升期: 從 0 線性爬升到 1 (在 peak_quarter 達到 1)
+    effectFactor = (tSinceLaunch + 1) / (peak_quarter + 1);
   } else {
-    const cappedKappa = Math.min(0.2, Math.max(0, kappa));
-    capacityFactor = 1 + cappedKappa;
+    // 2. 衰減期: 從 peak_quarter 開始，使用半衰期 H 進行指數衰減
+    const tSincePeak = tSinceLaunch - peak_quarter;
+    const decayExponent = -Math.log(2) * tSincePeak / half_life;
+    const clampedExp = Math.max(-100, Math.min(0, decayExponent));
+    effectFactor = Math.exp(clampedExp); // 在 peak_quarter 時, tSincePeak=0, effectFactor=1
   }
   
-  // Validate factors
-  if (!isFinite(accelerationFactor) || !isFinite(capacityFactor)) {
-    console.warn('Invalid factors:', { accelerationFactor, capacityFactor });
-    return baselineValue;
-  }
+  const cappedAlpha = Math.min(0.5, Math.max(0, alpha));
+  const accelerationFactor = 1 + cappedAlpha * effectFactor; // 套用效應
   
-  // Apply intervention with bounds
+  // --- 2. 上限擴張 (K) ---
+  // 讓 K 和 t0 的效應也跟隨 P 和 H 的曲線
+  const cappedKappa = Math.min(0.2, Math.max(0, kappa));
+  const expansionSmoother = effectFactor;
+  const capacityFactor = 1 + cappedKappa * expansionSmoother;
+  
+  // --- 3. 拐點前移 (t0) ---
+  const cappedDeltaT = Math.min(5, Math.max(0, delta_t));
+  const shiftSmoother = effectFactor;
+  const adjustedT0_shift = cappedDeltaT * shiftSmoother;
+  
+  // --- 組合參數 ---
   const adjustedK = K * capacityFactor;
-  const adjustedB = b * Math.min(2.0, accelerationFactor); // Cap acceleration
-  const adjustedT0 = t0 - Math.min(5, Math.max(0, delta_t)); // Cap shift
-  
-  // Validate adjusted parameters
-  if (!isFinite(adjustedK) || !isFinite(adjustedB) || !isFinite(adjustedT0)) {
-    console.warn('Invalid adjusted params:', { adjustedK, adjustedB, adjustedT0 });
-    return baselineValue;
-  }
-  
+  const adjustedB = b * accelerationFactor;
+  const adjustedT0 = t0 - adjustedT0_shift;
+
   const result = gompertzModel(t, adjustedK, adjustedB, adjustedT0);
   
-  // Return baseline if result is invalid
-  if (!isFinite(result)) {
-    console.warn('Invalid intervention result at t=' + t + ', returning baseline');
-    return baselineValue;
-  }
-  
-  return result;
+  // 確保介入結果不會低於基線
+  return isFinite(result) ? Math.max(baselineValue, result) : baselineValue;
 }
 
 // Step navigation
