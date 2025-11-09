@@ -938,20 +938,20 @@ textarea.form-control {
                 <div class="card__body">
                     <div id="fittingStatus" class="status-message">正在擬合模型...</div>
                     <div id="parametersDisplay" style="display: none;">
-                        <div class="params-grid">
-                            <div class="param-card">
-                                <div class="param-label">K (承載容量 / TAM)</div>
-                                <input type="number" class="param-input" id="inputParamK">
-                            </div>
-                            <div class="param-card">
-                                <div class="param-label">b (成長率)</div>
-                                <input type="number" step="0.001" class="param-input" id="inputParamB">
-                            </div>
-                            <div class="param-card">
-                                <div class="param-label">t₀ (轉折點)</div>
-                                <input type="number" step="0.01" class="param-input" id="inputParamT0">
-                            </div>
-                        </div>
+                      <div class="params-grid">
+                          <div class="param-card">
+                              <div class="param-label">K (承載容量 / TAM)</div>
+                              <input type="number" class="param-input" id="inputParamK">
+                          </div>
+                          <div class="param-card">
+                              <div class="param-label">b (成長率)</div>
+                              <input type="number" step="0.001" class="param-input" id="inputParamB">
+                          </div>
+                          <div class="param-card">
+                              <div class="param-label">t₀ (轉折點)</div>
+                              <input type="number" step="0.01" class="param-input" id="inputParamT0">
+                          </div>
+                      </div>
                     </div>
                 </div>
             </div>
@@ -1623,9 +1623,11 @@ function performFitting() {
     
     state.fittedParams = result.params;
     
+    // --- 修改：將值填入 input 而不是 textContent ---
     document.getElementById('inputParamK').value = Math.round(result.params.K);
     document.getElementById('inputParamB').value = result.params.b.toFixed(4);
     document.getElementById('inputParamT0').value = result.params.t0.toFixed(2);
+    // --- 修改結束 ---
     
     if (result.r2 > 0.95) {
       statusEl.innerHTML = '✔ 擬合成功！R² = ' + result.r2.toFixed(4) + ' (優異)';
