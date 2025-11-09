@@ -333,20 +333,26 @@ function applyIntervention(t, baselineValue, params, interventionParams, launchQ
 
 // Step navigation
 function goToStep(step) {
-  // Hide all sections
-  for (let i = 1; i <= 4; i++) {
-    document.getElementById(`step${i}`).style.display = 'none';
-    const stepEl = document.querySelector(`.step[data-step="${i}"]`);
-    stepEl.classList.remove('active', 'completed');
-    if (i < step) {
-      stepEl.classList.add('completed');
-    }
+  // Hide all step pages
+  document.querySelectorAll('.step-page').forEach(page => { // <-- 這是錯誤的邏輯 (1)
+    page.style.display = 'none';
+  });
+  
+  // Show the current step page
+  const activePage = document.getElementById(`step${step}`);
+  if (activePage) {
+    activePage.style.display = 'block';
   }
   
-  // Show current section
-  document.getElementById(`step${step}`).style.display = 'block';
-  document.querySelector(`.step[data-step="${step}"]`).classList.add('active');
-  state.currentStep = step;
+  // Update step indicators
+  document.querySelectorAll('.step-indicator').forEach(indicator => {
+    const indicatorStep = parseInt(indicator.getAttribute('data-step'));
+    if (indicatorStep === step) { // <-- 這是錯誤的邏輯 (2)
+      indicator.classList.add('active');
+    } else {
+      indicator.classList.remove('active');
+    }
+  });
 }
 
 // Step 1: Data Input
