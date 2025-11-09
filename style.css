@@ -737,53 +737,6 @@ select.form-control {
     format('woff2');
 }
 
-/* ========================================
-   9. NEW INTERPOLATION STYLES
-   ======================================== */
-.status-badge.interpolated {
-  background: rgba(var(--color-teal-500-rgb), 0.15);
-  color: var(--color-primary);
-}
-
-.interpolation-options {
-  display: grid;
-  gap: var(--space-12);
-}
-
-.interpolation-option {
-  display: flex;
-  align-items: flex-start;
-  padding: var(--space-12);
-  border-radius: var(--radius-base);
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-1);
-}
-
-.interpolation-option input {
-  margin-top: var(--space-4);
-  margin-right: var(--space-12);
-}
-
-.interpolation-option label {
-  margin: 0;
-  font-weight: var(--font-weight-medium);
-}
-
-.interpolation-option label span {
-  display: block;
-  font-weight: var(--font-weight-normal);
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
-}
-
-.impact-box {
-  margin-top: var(--space-16);
-  padding: var(--space-12);
-  border-radius: var(--radius-base);
-  background: var(--color-bg-3);
-  border: 1px solid rgba(var(--color-success-rgb), 0.2);
-}
-
 /* END PERPLEXITY DESIGN SYSTEM */
 /* 
  * All styles are now integrated into index.html
