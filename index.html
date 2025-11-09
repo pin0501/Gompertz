@@ -1089,7 +1089,70 @@ textarea.form-control {
                         <canvas id="forecastChart"></canvas>
                     </div>
                 </div>
+            </div> <div class="card" id="incrementalChartCard">
+                <div class="card__header">
+                    <h3>情境增量效益 (直方圖)</h3>
+                </div>
+                <div class="card__body">
+                    <div class="chart-container">
+                        <canvas id="incrementalChart"></canvas>
+                    </div>
+                </div>
             </div>
+
+            <div class="card"> ```
+
+---
+
+### 步驟 3：(替換) `generateForecasts` 函式
+
+我們將替換這個函式，讓它**呼叫新的直方圖函式** `displayIncrementalChart()`。
+
+請將**第 1334 行**開始的**整個** `generateForecasts` 函式**替換**為以下版本：
+
+```javascript
+function generateForecasts() {
+  const forecastYears = parseInt(document.getElementById('forecastYears').value);
+  const forecastQuarters = forecastYears * 4;
+  let platformLaunch = parseInt(document.getElementById('platformLaunch').value);
+  
+  if (!platformLaunch || platformLaunch < 1) {
+    platformLaunch = 3;
+    document.getElementById('platformLaunch').value = 3;
+  }
+  
+  state.platformLaunchQuarter = platformLaunch;
+  
+  const lastPeriod = state.historicalData[state.historicalData.length - 1].period;
+  const forecastPeriods = generateQuarters(lastPeriod, forecastQuarters + 1).slice(1);
+  const baseOffset = state.historicalData.length;
+  
+  const forecasts = {
+    periods: forecastPeriods,
+    baseline: [],
+    conservative: [],
+    moderate: [],
+    aggressive: []
+  };
+  
+  for (let i = 0; i < forecastQuarters; i++) {
+    const t = baseOffset + i;
+    const baseline = gompertzModel(t, state.fittedParams.K, state.fittedParams.b, state.fittedParams.t0);
+    
+    forecasts.baseline.push(baseline);
+    forecasts.conservative.push(applyIntervention(t, baseline, state.fittedParams, state.scenarioParams.conservative, baseOffset + platformLaunch));
+    forecasts.moderate.push(applyIntervention(t, baseline, state.fittedParams, state.scenarioParams.moderate, baseOffset + platformLaunch));
+    forecasts.aggressive.push(applyIntervention(t, baseline, state.fittedParams, state.scenarioParams.aggressive, baseOffset + platformLaunch));
+  }
+  
+  state.forecastData = forecasts;
+  
+  goToStep(4);
+  displayForecastChart();
+  displayIncrementalChart(); // <-- 在這裡新增了呼叫
+  displayForecastTable();
+}
+
 
             <div class="card">
                 <div class="card__header">
@@ -1153,6 +1216,7 @@ const state = {
 
 let fittingChart = null;
 let forecastChart = null;
+let incrementalChart = null; // <-- 新增這一行
 
 // ======================================
 // 2. UTILITY FUNCTIONS
@@ -2133,45 +2197,141 @@ function displayForecastChart() {
   
   const filterNaN = (arr) => arr.map(v => isFinite(v) ? v : null);
   
+  // 1. 準備標籤 (歷史 + 預測)
+  const historicalLabels = state.historicalData.map(d => d.period);
+  const allLabels = [...historicalLabels, ...state.forecastData.periods];
+  
+  // 2. 準備數據集
+  const historicalActual = state.historicalData.map(d => d.accounts);
+  const forecastQuarters = state.forecastData.periods.length;
+  const historyLength = historicalLabels.length;
+
+  const datasets = [
+    {
+      label: '歷史數據',
+      data: [...historicalActual, ...new Array(forecastQuarters).fill(null)],
+      borderColor: '#3b82f6',
+      backgroundColor: 'rgba(59, 130, 246, 0.1)',
+      pointRadius: 3,
+      borderWidth: 2
+    },
+    {
+      label: '基線',
+      data: [...new Array(historyLength).fill(null), ...filterNaN(state.forecastData.baseline)],
+      borderColor: '#6b7280',
+      backgroundColor: 'transparent',
+      borderWidth: 3,
+      pointRadius: 0
+    },
+    {
+      label: '保守型',
+      data: [...new Array(historyLength).fill(null), ...filterNaN(state.forecastData.conservative)],
+      borderColor: 'rgba(59, 130, 246, 0.7)',
+      backgroundColor: 'transparent',
+      borderWidth: 2,
+      borderDash: [5, 3],
+      pointRadius: 0
+    },
+    {
+      label: '穩健型',
+      data: [...new Array(historyLength).fill(null), ...filterNaN(state.forecastData.moderate)],
+      borderColor: 'rgba(16, 185, 129, 0.7)',
+      backgroundColor: 'transparent',
+      borderWidth: 2,
+      borderDash: [5, 3],
+      pointRadius: 0
+    },
+    {
+      label: '積極型',
+      data: [...new Array(historyLength).fill(null), ...filterNaN(state.forecastData.aggressive)],
+      borderColor: 'rgba(239, 68, 68, 0.7)',
+      backgroundColor: 'transparent',
+      borderWidth: 2,
+      borderDash: [5, 3],
+      pointRadius: 0
+    }
+  ];
+
   forecastChart = new Chart(ctx, {
     type: 'line',
+    data: {
+      labels: allLabels,
+      datasets: datasets
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      spanGaps: false, // 確保線條在 null 值處斷開
+      plugins: {
+        legend: { display: true, position: 'top' },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              const value = context.parsed.y;
+              if (value === null || !isFinite(value)) return context.dataset.label + ': N/A';
+              return context.dataset.label + ': ' + formatNumber(value);
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true, // 從 0 開始以包含歷史數據
+          ticks: { callback: function(value) { return formatNumber(value); } }
+        }
+      }
+    }
+  });
+}
+
+// --- 新增：增量效益直方圖 ---
+function displayIncrementalChart() {
+  const ctx = document.getElementById('incrementalChart').getContext('2d');
+
+  // 安全地計算增量 (處理 NaN)
+  const safeIncremental = (scenario) => {
+    return state.forecastData[scenario].map((v, i) => {
+      const baseline = state.forecastData.baseline[i];
+      if (isFinite(v) && isFinite(baseline)) {
+        return Math.max(0, v - baseline); // 確保增量不為負
+      }
+      return null; // 如果基線或情境值無效，則不顯示
+    });
+  };
+  
+  const incrementalConservative = safeIncremental('conservative');
+  const incrementalModerate = safeIncremental('moderate');
+  const incrementalAggressive = safeIncremental('aggressive');
+  
+  if (incrementalChart) {
+    incrementalChart.destroy();
+  }
+  
+  incrementalChart = new Chart(ctx, {
+    type: 'bar',
     data: {
       labels: state.forecastData.periods,
       datasets: [
         {
-          label: '基線',
-          data: filterNaN(state.forecastData.baseline),
-          borderColor: '#6b7280',
-          backgroundColor: 'transparent',
-          borderWidth: 3,
-          pointRadius: 0
-        },
-        {
-          label: '保守型',
-          data: filterNaN(state.forecastData.conservative),
+          label: '保守型增量',
+          data: incrementalConservative,
+          backgroundColor: 'rgba(59, 130, 246, 0.6)',
           borderColor: '#3b82f6',
-          backgroundColor: 'transparent',
-          borderWidth: 2,
-          borderDash: [5, 3],
-          pointRadius: 0
+          borderWidth: 1
         },
         {
-          label: '穩健型',
-          data: filterNaN(state.forecastData.moderate),
+          label: '穩健型增量',
+          data: incrementalModerate,
+          backgroundColor: 'rgba(16, 185, 129, 0.6)',
           borderColor: '#10b981',
-          backgroundColor: 'transparent',
-          borderWidth: 2,
-          borderDash: [5, 3],
-          pointRadius: 0
+          borderWidth: 1
         },
         {
-          label: '積極型',
-          data: filterNaN(state.forecastData.aggressive),
+          label: '積極型增量',
+          data: incrementalAggressive,
+          backgroundColor: 'rgba(239, 68, 68, 0.6)',
           borderColor: '#ef4444',
-          backgroundColor: 'transparent',
-          borderWidth: 2,
-          borderDash: [5, 3],
-          pointRadius: 0
+          borderWidth: 1
         }
       ]
     },
@@ -2191,9 +2351,11 @@ function displayForecastChart() {
         }
       },
       scales: {
-        y: {
-          beginAtZero: false,
-          ticks: { callback: function(value) { return formatNumber(value); } }
+        x: { stacked: false }, // 改為 false (並排)
+        y: { 
+            stacked: false, 
+            beginAtZero: true,
+            ticks: { callback: function(value) { return formatNumber(value); } }
         }
       }
     }
@@ -2202,8 +2364,22 @@ function displayForecastChart() {
 
 function displayForecastTable() {
   const tbody = document.querySelector('#forecastTable tbody');
-  tbody.innerHTML = '';
+  // --- 修改：新增 <th> 標籤 ---
+  const thead = document.querySelector('#forecastTable thead');
+  thead.innerHTML = `
+    <tr>
+        <th>期間</th>
+        <th>基線</th>
+        <th>保守型</th>
+        <th>保守增量</th>
+        <th>穩健型</th>
+        <th>穩健增量</th>
+        <th>積極型</th>
+        <th>積極增量</th>
+    </tr>
+  `;
   
+  tbody.innerHTML = '';
   const n = state.forecastData.periods.length;
   
   for (let i = 0; i < n; i++) {
@@ -2216,12 +2392,21 @@ function displayForecastTable() {
     
     const formatSafe = (val) => isFinite(val) ? formatNumber(val) : 'N/A';
     
+    // --- (新) 計算增量 ---
+    const consIncr = (isFinite(conservative) && isFinite(baseline)) ? (conservative - baseline) : NaN;
+    const modIncr = (isFinite(moderate) && isFinite(baseline)) ? (moderate - baseline) : NaN;
+    const aggIncr = (isFinite(aggressive) && isFinite(baseline)) ? (aggressive - baseline) : NaN;
+    
+    // --- 修改：新增 <td> 標籤 ---
     tr.innerHTML = `
       <td>${state.forecastData.periods[i]}</td>
       <td>${formatSafe(baseline)}</td>
       <td>${formatSafe(conservative)}</td>
+      <td style="background: var(--color-bg-1);">${formatSafe(consIncr)}</td>
       <td>${formatSafe(moderate)}</td>
+      <td style="background: var(--color-bg-3);">${formatSafe(modIncr)}</td>
       <td>${formatSafe(aggressive)}</td>
+      <td style="background: var(--color-bg-4);">${formatSafe(aggIncr)}</td>
     `;
     
     tbody.appendChild(tr);
