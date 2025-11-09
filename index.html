@@ -2156,47 +2156,7 @@ function loadScenarioPreset(scenario) {
 // ======================================
 // 8. FORECAST GENERATION & DISPLAY
 // ======================================
-function generateForecasts() {
-  const forecastYears = parseInt(document.getElementById('forecastYears').value);
-  const forecastQuarters = forecastYears * 4;
-  let platformLaunch = parseInt(document.getElementById('platformLaunch').value);
-  
-  if (!platformLaunch || platformLaunch < 1) {
-    platformLaunch = 3;
-    document.getElementById('platformLaunch').value = 3;
-  }
-  
-  state.platformLaunchQuarter = platformLaunch;
-  
-  const lastPeriod = state.historicalData[state.historicalData.length - 1].period;
-  const forecastPeriods = generateQuarters(lastPeriod, forecastQuarters + 1).slice(1);
-  const baseOffset = state.historicalData.length;
-  
-  const forecasts = {
-    periods: forecastPeriods,
-    baseline: [],
-    conservative: [],
-    moderate: [],
-    aggressive: []
-  };
-  
-  for (let i = 0; i < forecastQuarters; i++) {
-    const t = baseOffset + i;
-    const baseline = gompertzModel(t, state.fittedParams.K, state.fittedParams.b, state.fittedParams.t0);
-    
-    forecasts.baseline.push(baseline);
-    forecasts.conservative.push(applyIntervention(t, baseline, state.fittedParams, state.scenarioParams.conservative, baseOffset + platformLaunch));
-    forecasts.moderate.push(applyIntervention(t, baseline, state.fittedParams, state.scenarioParams.moderate, baseOffset + platformLaunch));
-    forecasts.aggressive.push(applyIntervention(t, baseline, state.fittedParams, state.scenarioParams.aggressive, baseOffset + platformLaunch));
-  }
-  
-  state.forecastData = forecasts;
-  
-  goToStep(4);
-  displayForecastChart();
-  displayIncrementalChart(); // <-- 這是新增的呼叫
-  displayForecastTable();
-}
+generateForecasts
 
 function displayForecastChart() {
   const ctx = document.getElementById('forecastChart').getContext('2d');
@@ -2296,56 +2256,11 @@ function displayForecastChart() {
 // --- 新增：增量效益直方圖 ---
 function displayIncrementalChart() {
   const ctx = document.getElementById('incrementalChart').getContext('2d');
-
-  // --- (新) 邏輯：計算 "每季的" 增量效益 ---
-  const safeIncrementalQuarterly = (scenario) => {
-    const baselineData = state.forecastData.baseline;
-    const scenarioData = state.forecastData[scenario];
-    const results = [];
-
-    // 獲取歷史數據的最後一個點，作為 t=0 的比較基線
-    const lastHistorical = state.historicalData[state.historicalData.length - 1];
-    let prevBaseline = lastHistorical.accounts;
-    let prevScenario = lastHistorical.accounts;
-
-    // 處理最後一個歷史點可能是插值或無效的罕見情況
-    if (!isFinite(prevBaseline)) {
-        prevBaseline = gompertzModel(state.historicalData.length - 1, state.fittedParams.K, state.fittedParams.b, state.fittedParams.t0);
-        prevScenario = prevBaseline;
-    }
-
-    // 迭代預測數據
-    for (let i = 0; i < scenarioData.length; i++) {
-      const currentBaseline = baselineData[i];
-      const currentScenario = scenarioData[i];
-
-      if (!isFinite(currentBaseline) || !isFinite(currentScenario) || !isFinite(prevBaseline) || !isFinite(prevScenario)) {
-        results.push(null);
-      } else {
-        // 1. 計算基線的"當季"新增
-        const baselineQuarterlyAdd = currentBaseline - prevBaseline;
-        
-        // 2. 計算情境的"當季"新增
-        const scenarioQuarterlyAdd = currentScenario - prevScenario;
-        
-        // 3. 計算 "情境當季新增" - "基線當季新增"
-        const incrementalQuarterlyBenefit = scenarioQuarterlyAdd - baselineQuarterlyAdd;
-        
-        // 我們只顯示正向效益
-        results.push(Math.max(0, incrementalQuarterlyBenefit));
-      }
-      
-      // 更新 "前一季" 的值，為下一次循環做準備
-      prevBaseline = currentBaseline;
-      prevScenario = currentScenario;
-    }
-    return results;
-  };
-  // --- (新) 邏輯結束 ---
   
-  const incrementalConservative = safeIncrementalQuarterly('conservative');
-  const incrementalModerate = safeIncrementalQuarterly('moderate');
-  const incrementalAggressive = safeIncrementalQuarterly('aggressive');
+  // --- (新) 簡化：直接從 state 讀取已算好的值 ---
+  const incrementalConservative = state.forecastData.cons_quarterly_incr.map(v => isFinite(v) ? v : null);
+  const incrementalModerate = state.forecastData.mod_quarterly_incr.map(v => isFinite(v) ? v : null);
+  const incrementalAggressive = state.forecastData.agg_quarterly_incr.map(v => isFinite(v) ? v : null);
   
   if (incrementalChart) {
     incrementalChart.destroy();
@@ -2408,18 +2323,17 @@ function displayIncrementalChart() {
 
 function displayForecastTable() {
   const tbody = document.querySelector('#forecastTable tbody');
-  // --- 修改：新增 <th> 標籤 ---
   const thead = document.querySelector('#forecastTable thead');
   thead.innerHTML = `
     <tr>
         <th>期間</th>
         <th>基線</th>
         <th>保守型</th>
-        <th>保守增量</th>
+        <th>保守(當季)增量</th>
         <th>穩健型</th>
-        <th>穩健增量</th>
+        <th>穩健(當季)增量</th>
         <th>積極型</th>
-        <th>積極增量</th>
+        <th>積極(當季)增量</th>
     </tr>
   `;
   
@@ -2429,19 +2343,18 @@ function displayForecastTable() {
   for (let i = 0; i < n; i++) {
     const tr = document.createElement('tr');
     
+    const formatSafe = (val) => isFinite(val) ? formatNumber(val) : 'N/A';
+    
+    // --- (新) 簡化：直接從 state 讀取所有值 ---
     const baseline = state.forecastData.baseline[i];
     const conservative = state.forecastData.conservative[i];
     const moderate = state.forecastData.moderate[i];
     const aggressive = state.forecastData.aggressive[i];
     
-    const formatSafe = (val) => isFinite(val) ? formatNumber(val) : 'N/A';
+    const consIncr = state.forecastData.cons_quarterly_incr[i];
+    const modIncr = state.forecastData.mod_quarterly_incr[i];
+    const aggIncr = state.forecastData.agg_quarterly_incr[i];
     
-    // --- (新) 計算增量 ---
-    const consIncr = (isFinite(conservative) && isFinite(baseline)) ? (conservative - baseline) : NaN;
-    const modIncr = (isFinite(moderate) && isFinite(baseline)) ? (moderate - baseline) : NaN;
-    const aggIncr = (isFinite(aggressive) && isFinite(baseline)) ? (aggressive - baseline) : NaN;
-    
-    // --- 修改：新增 <td> 標籤 ---
     tr.innerHTML = `
       <td>${state.forecastData.periods[i]}</td>
       <td>${formatSafe(baseline)}</td>
@@ -2458,22 +2371,22 @@ function displayForecastTable() {
 }
 
 function exportCSV() {
-  // --- 修改：新增增量欄位 ---
-  let csv = '期間,基線,保守型,保守增量,穩健型,穩健增量,積極型,積極增量\n';
+  // --- 修改：欄位名稱改為 "當季增量" ---
+  let csv = '期間,基線,保守型,保守(當季)增量,穩健型,穩健(當季)增量,積極型,積極(當季)增量\n';
   
   const n = state.forecastData.periods.length;
   for (let i = 0; i < n; i++) {
+    
+    // --- (新) 簡化：直接從 state 讀取所有值 ---
     const baseline = state.forecastData.baseline[i];
     const conservative = state.forecastData.conservative[i];
     const moderate = state.forecastData.moderate[i];
     const aggressive = state.forecastData.aggressive[i];
     
-    // --- (新) 計算增量 ---
-    const consIncr = (isFinite(conservative) && isFinite(baseline)) ? (conservative - baseline) : NaN;
-    const modIncr = (isFinite(moderate) && isFinite(baseline)) ? (moderate - baseline) : NaN;
-    const aggIncr = (isFinite(aggressive) && isFinite(baseline)) ? (aggressive - baseline) : NaN;
+    const consIncr = state.forecastData.cons_quarterly_incr[i];
+    const modIncr = state.forecastData.mod_quarterly_incr[i];
+    const aggIncr = state.forecastData.agg_quarterly_incr[i];
     
-    // --- 修改：格式化所有值 ---
     const baselineStr = isFinite(baseline) ? baseline.toFixed(0) : 'N/A';
     const conservativeStr = isFinite(conservative) ? conservative.toFixed(0) : 'N/A';
     const moderateStr = isFinite(moderate) ? moderate.toFixed(0) : 'N/A';
@@ -2482,17 +2395,15 @@ function exportCSV() {
     const modIncrStr = isFinite(modIncr) ? modIncr.toFixed(0) : 'N/A';
     const aggIncrStr = isFinite(aggIncr) ? aggIncr.toFixed(0) : 'N/A';
     
-    // --- 修改：新增增量欄位到 CSV ---
     csv += `${state.forecastData.periods[i]},${baselineStr},${conservativeStr},${consIncrStr},${moderateStr},${modIncrStr},${aggressiveStr},${aggIncrStr}\n`;
   }
   
-  // 加上 UTF-8 BOM 確保 Excel 能正確開啟中文
   const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
   const blob = new Blob([bom, csv], { type: 'text/csv;charset=utf-8,' });
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'forecast_data.csv';
+  a.download = 'forecast_data_quarterly_incremental.csv';
   a.click();
   window.URL.revokeObjectURL(url);
 }
@@ -2504,17 +2415,16 @@ function generateFullReport() {
     return;
   }
   
-  // 安全的格式化函式
   const formatSafe = (val) => isFinite(val) ? formatNumber(val) : 'N/A';
   let reportContent = "";
 
-  // 報告標頭
+  // 報告標頭... (這部分不變)
   reportContent += "========================================\n";
   reportContent += "  Gompertz 平台介入效應分析報告\n";
   reportContent += "========================================\n\n";
   reportContent += `報告生成時間: ${new Date().toLocaleString('zh-TW')}\n\n`;
 
-  // --- 1. 數據輸入與品質 ---
+  // --- 1. 數據輸入與品質 --- (不變)
   reportContent += "===== 1. 數據輸入與品質 =====\n\n";
   reportContent += `數據品質分數: ${state.dataQuality.score}/100\n`;
   reportContent += `插值方法: ${getMethodName(state.interpolationMethod)}\n\n`;
@@ -2532,7 +2442,7 @@ function generateFullReport() {
   reportContent += formatTextTable(inputHeaders, inputRows);
   reportContent += "\n\n";
 
-  // --- 2. 基線模型擬合 ---
+  // --- 2. 基線模型擬合 --- (不變)
   reportContent += "===== 2. 基線模型擬合 =====\n\n";
   reportContent += "擬合參數 (最終使用):\n";
   reportContent += `  - K (承載容量/TAM): ${formatNumber(state.fittedParams.K)}\n`;
@@ -2543,41 +2453,44 @@ function generateFullReport() {
   const r2 = calculateR2(validData, state.fittedParams);
   reportContent += `最終擬合 R²: ${r2.toFixed(4)}\n\n`;
 
-  // --- 3. 情境配置 ---
+  // --- 3. 情境配置 --- (修改: 加入 P 參數)
   reportContent += "===== 3. 情境配置 =====\n\n";
   const lastPeriod = state.historicalData[state.historicalData.length - 1].period;
   const firstFuturePeriod = getNextQuarter(lastPeriod);
   reportContent += `平台啟動季度: ${state.platformLaunchQuarter} (即 ${firstFuturePeriod} 之後的第 ${state.platformLaunchQuarter} 季)\n\n`;
   reportContent += "介入參數:\n";
-  const configHeaders = ["情境", "α (加速)", "H (半衰期)", "Δt (拐點前移)", "κ (TAM 擴張)"];
+  const configHeaders = ["情境", "α (加速)", "H (半衰期)", "Δt (拐點前移)", "κ (TAM 擴張)", "P (效應高峰)"];
   const configRows = ['conservative', 'moderate', 'aggressive'].map(s => {
     const p = state.scenarioParams[s];
     return [
-      s.charAt(0).toUpperCase() + s.slice(1), // 首字母大寫
+      s.charAt(0).toUpperCase() + s.slice(1), 
       `${(p.alpha * 100).toFixed(0)}%`, 
       p.half_life, 
       p.delta_t, 
-      `${(p.kappa * 100).toFixed(0)}%`
+      `${(p.kappa * 100).toFixed(0)}%`,
+      `${p.peak_quarter} 季` // (新)
     ];
   });
   reportContent += formatTextTable(configHeaders, configRows);
   reportContent += "\n\n";
 
-  // --- 4. 預測結果 ---
-  reportContent += "===== 4. 預測結果 =====\n\n";
-  const outputHeaders = ["期間", "基線", "保守型", "保守增量", "穩健型", "穩健增量", "積極型", "積極增量"];
+  // --- 4. 預測結果 --- (修改: 使用 "當季增量")
+  reportContent += "===== 4. 預測結果 (當季增量) =====\n\n";
+  const outputHeaders = ["期間", "基線", "保守型", "保守(當季)增量", "穩健型", "穩健(當季)增量", "積極型", "積極(當季)增量"];
   const outputRows = [];
   
   for (let i = 0; i < state.forecastData.periods.length; i++) {
     const period = state.forecastData.periods[i];
+    
+    // --- (新) 簡化：直接從 state 讀取所有值 ---
     const baseline = state.forecastData.baseline[i];
     const conservative = state.forecastData.conservative[i];
     const moderate = state.forecastData.moderate[i];
     const aggressive = state.forecastData.aggressive[i];
-
-    const consIncr = (isFinite(conservative) && isFinite(baseline)) ? (conservative - baseline) : NaN;
-    const modIncr = (isFinite(moderate) && isFinite(baseline)) ? (moderate - baseline) : NaN;
-    const aggIncr = (isFinite(aggressive) && isFinite(baseline)) ? (aggressive - baseline) : NaN;
+    
+    const consIncr = state.forecastData.cons_quarterly_incr[i];
+    const modIncr = state.forecastData.mod_quarterly_incr[i];
+    const aggIncr = state.forecastData.agg_quarterly_incr[i];
 
     outputRows.push([
       period,
@@ -2593,13 +2506,13 @@ function generateFullReport() {
   reportContent += formatTextTable(outputHeaders, outputRows);
   reportContent += "\n\n--- 報告結束 ---\n";
 
-  // --- 5. 下載 ---
-  const bom = new Uint8Array([0xEF, 0xBB, 0xBF]); // BOM for UTF-8 (確保 Excel/記事本能開中文)
+  // --- 5. 下載 --- (不變)
+  const bom = new Uint8Array([0xEF, 0xBB, 0xBF]); 
   const blob = new Blob([bom, reportContent], { type: 'text/plain;charset=utf-8' });
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
+  a.download = `Gompertz_Report_${new Date().toISOString().split('T')[0]}.txt`;
   a.href = url;
-  a.download = `Gompertz_Report_${new Date().toISOString().split('T')[0]}.txt`; // e.g., Gompertz_Report_2025-11-09.txt
   a.click();
   window.URL.revokeObjectURL(url);
 }
