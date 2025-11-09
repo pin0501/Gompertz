@@ -1105,7 +1105,8 @@ textarea.form-control {
                     <h3>預測數據表</h3>
                     <div class="chart-controls">
                         <button class="btn btn--sm btn--outline" id="exportCSVBtn">匯出 CSV</button>
-                    </div>
+                        <button class="btn btn--sm btn--outline" id="exportReportBtn" style="margin-left: 8px;">下載完整報告 (.txt)</button>
+                      </div>
                 </div>
                 <div class="card__body">
                     <div class="table-container">
@@ -1220,6 +1221,40 @@ function showToast(message, duration = 3000) {
     toast.style.transition = 'opacity 0.3s';
     setTimeout(() => toast.remove(), 300);
   }, duration);
+}
+
+// --- 新增：純文字表格格式化工具 ---
+function formatTextTable(headers, rows) {
+  // 決定每列的最大寬度 (帶有 padding)
+  const colWidths = headers.map((h, i) => {
+    return Math.max(
+      h.length, 
+      ...rows.map(row => row[i] ? row[i].toString().length : 0)
+    ) + 4; // 增加 4 個 padding
+  });
+
+  // 格式化標頭
+  let headerRow = "";
+  headers.forEach((h, i) => {
+    headerRow += h.padEnd(colWidths[i]);
+  });
+
+  // 格式化分隔線
+  let separatorRow = "";
+  colWidths.forEach(w => {
+    separatorRow += "-".repeat(w);
+  });
+  
+  // 格式化數據行
+  const dataRows = rows.map(row => {
+    let rowStr = "";
+    row.forEach((cell, i) => {
+      rowStr += (cell ? cell.toString() : "").padEnd(colWidths[i]);
+    });
+    return rowStr;
+  }).join('\n');
+
+  return `${headerRow}\n${separatorRow}\n${dataRows}`;
 }
 
 // ======================================
@@ -2436,6 +2471,113 @@ function exportCSV() {
   window.URL.revokeObjectURL(url);
 }
 
+// --- 新增：生成完整報告 ---
+function generateFullReport() {
+  if (!state.forecastData) {
+    alert('請先生成預測結果。');
+    return;
+  }
+  
+  // 安全的格式化函式
+  const formatSafe = (val) => isFinite(val) ? formatNumber(val) : 'N/A';
+  let reportContent = "";
+
+  // 報告標頭
+  reportContent += "========================================\n";
+  reportContent += "  Gompertz 平台介入效應分析報告\n";
+  reportContent += "========================================\n\n";
+  reportContent += `報告生成時間: ${new Date().toLocaleString('zh-TW')}\n\n`;
+
+  // --- 1. 數據輸入與品質 ---
+  reportContent += "===== 1. 數據輸入與品質 =====\n\n";
+  reportContent += `數據品質分數: ${state.dataQuality.score}/100\n`;
+  reportContent += `插值方法: ${getMethodName(state.interpolationMethod)}\n\n`;
+  reportContent += "品質問題:\n";
+  state.dataQuality.issues.forEach(issue => {
+    reportContent += `  - ${issue.title}: ${issue.description}\n`;
+  });
+  reportContent += "\n歷史數據 (包含插值):\n";
+  const inputHeaders = ["期間", "帳戶數", "狀態"];
+  const inputRows = state.historicalData.map(d => [
+    d.period,
+    d.isMissing ? 'N/A' : formatNumber(d.accounts),
+    d.dataType
+  ]);
+  reportContent += formatTextTable(inputHeaders, inputRows);
+  reportContent += "\n\n";
+
+  // --- 2. 基線模型擬合 ---
+  reportContent += "===== 2. 基線模型擬合 =====\n\n";
+  reportContent += "擬合參數 (最終使用):\n";
+  reportContent += `  - K (承載容量/TAM): ${formatNumber(state.fittedParams.K)}\n`;
+  reportContent += `  - b (成長率): ${state.fittedParams.b.toFixed(4)}\n`;
+  reportContent += `  - t₀ (轉折點): ${state.fittedParams.t0.toFixed(2)}\n\n`;
+  
+  const validData = state.historicalData.filter(d => !d.isMissing).map(d => d.accounts);
+  const r2 = calculateR2(validData, state.fittedParams);
+  reportContent += `最終擬合 R²: ${r2.toFixed(4)}\n\n`;
+
+  // --- 3. 情境配置 ---
+  reportContent += "===== 3. 情境配置 =====\n\n";
+  const lastPeriod = state.historicalData[state.historicalData.length - 1].period;
+  const firstFuturePeriod = getNextQuarter(lastPeriod);
+  reportContent += `平台啟動季度: ${state.platformLaunchQuarter} (即 ${firstFuturePeriod} 之後的第 ${state.platformLaunchQuarter} 季)\n\n`;
+  reportContent += "介入參數:\n";
+  const configHeaders = ["情境", "α (加速)", "H (半衰期)", "Δt (拐點前移)", "κ (TAM 擴張)"];
+  const configRows = ['conservative', 'moderate', 'aggressive'].map(s => {
+    const p = state.scenarioParams[s];
+    return [
+      s.charAt(0).toUpperCase() + s.slice(1), // 首字母大寫
+      `${(p.alpha * 100).toFixed(0)}%`, 
+      p.half_life, 
+      p.delta_t, 
+      `${(p.kappa * 100).toFixed(0)}%`
+    ];
+  });
+  reportContent += formatTextTable(configHeaders, configRows);
+  reportContent += "\n\n";
+
+  // --- 4. 預測結果 ---
+  reportContent += "===== 4. 預測結果 =====\n\n";
+  const outputHeaders = ["期間", "基線", "保守型", "保守增量", "穩健型", "穩健增量", "積極型", "積極增量"];
+  const outputRows = [];
+  
+  for (let i = 0; i < state.forecastData.periods.length; i++) {
+    const period = state.forecastData.periods[i];
+    const baseline = state.forecastData.baseline[i];
+    const conservative = state.forecastData.conservative[i];
+    const moderate = state.forecastData.moderate[i];
+    const aggressive = state.forecastData.aggressive[i];
+
+    const consIncr = (isFinite(conservative) && isFinite(baseline)) ? (conservative - baseline) : NaN;
+    const modIncr = (isFinite(moderate) && isFinite(baseline)) ? (moderate - baseline) : NaN;
+    const aggIncr = (isFinite(aggressive) && isFinite(baseline)) ? (aggressive - baseline) : NaN;
+
+    outputRows.push([
+      period,
+      formatSafe(baseline),
+      formatSafe(conservative),
+      formatSafe(consIncr),
+      formatSafe(moderate),
+      formatSafe(modIncr),
+      formatSafe(aggressive),
+      formatSafe(aggIncr)
+    ]);
+  }
+  reportContent += formatTextTable(outputHeaders, outputRows);
+  reportContent += "\n\n--- 報告結束 ---\n";
+
+  // --- 5. 下載 ---
+  const bom = new Uint8Array([0xEF, 0xBB, 0xBF]); // BOM for UTF-8 (確保 Excel/記事本能開中文)
+  const blob = new Blob([bom, reportContent], { type: 'text/plain;charset=utf-8' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Gompertz_Report_${new Date().toISOString().split('T')[0]}.txt`; // e.g., Gompertz_Report_2025-11-09.txt
+  a.click();
+  window.URL.revokeObjectURL(url);
+}
+
 // ======================================
 // 9. EVENT LISTENERS & INITIALIZATION
 // ======================================
@@ -2517,7 +2659,9 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   
 document.getElementById('exportCSVBtn').addEventListener('click', exportCSV);
-  
+// --- 新增：報告按鈕事件 ---
+  document.getElementById('exportReportBtn').addEventListener('click', generateFullReport);
+
   // --- 新增：插值卡片事件 ---
   document.querySelectorAll('input[name="interpolation"]').forEach(radio => {
     radio.addEventListener('change', (e) => {
