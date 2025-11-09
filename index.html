@@ -1100,60 +1100,6 @@ textarea.form-control {
                 </div>
             </div>
 
-            <div class="card"> ```
-
----
-
-### 步驟 3：(替換) `generateForecasts` 函式
-
-我們將替換這個函式，讓它**呼叫新的直方圖函式** `displayIncrementalChart()`。
-
-請將**第 1334 行**開始的**整個** `generateForecasts` 函式**替換**為以下版本：
-
-```javascript
-function generateForecasts() {
-  const forecastYears = parseInt(document.getElementById('forecastYears').value);
-  const forecastQuarters = forecastYears * 4;
-  let platformLaunch = parseInt(document.getElementById('platformLaunch').value);
-  
-  if (!platformLaunch || platformLaunch < 1) {
-    platformLaunch = 3;
-    document.getElementById('platformLaunch').value = 3;
-  }
-  
-  state.platformLaunchQuarter = platformLaunch;
-  
-  const lastPeriod = state.historicalData[state.historicalData.length - 1].period;
-  const forecastPeriods = generateQuarters(lastPeriod, forecastQuarters + 1).slice(1);
-  const baseOffset = state.historicalData.length;
-  
-  const forecasts = {
-    periods: forecastPeriods,
-    baseline: [],
-    conservative: [],
-    moderate: [],
-    aggressive: []
-  };
-  
-  for (let i = 0; i < forecastQuarters; i++) {
-    const t = baseOffset + i;
-    const baseline = gompertzModel(t, state.fittedParams.K, state.fittedParams.b, state.fittedParams.t0);
-    
-    forecasts.baseline.push(baseline);
-    forecasts.conservative.push(applyIntervention(t, baseline, state.fittedParams, state.scenarioParams.conservative, baseOffset + platformLaunch));
-    forecasts.moderate.push(applyIntervention(t, baseline, state.fittedParams, state.scenarioParams.moderate, baseOffset + platformLaunch));
-    forecasts.aggressive.push(applyIntervention(t, baseline, state.fittedParams, state.scenarioParams.aggressive, baseOffset + platformLaunch));
-  }
-  
-  state.forecastData = forecasts;
-  
-  goToStep(4);
-  displayForecastChart();
-  displayIncrementalChart(); // <-- 在這裡新增了呼叫
-  displayForecastTable();
-}
-
-
             <div class="card">
                 <div class="card__header">
                     <h3>預測數據表</h3>
