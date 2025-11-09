@@ -2156,7 +2156,89 @@ function loadScenarioPreset(scenario) {
 // ======================================
 // 8. FORECAST GENERATION & DISPLAY
 // ======================================
-generateForecasts
+function generateForecasts() {
+  const forecastYears = parseInt(document.getElementById('forecastYears').value);
+  const forecastQuarters = forecastYears * 4;
+  let platformLaunch = parseInt(document.getElementById('platformLaunch').value);
+  
+  if (!platformLaunch || platformLaunch < 1) {
+    platformLaunch = 3;
+    document.getElementById('platformLaunch').value = 3;
+  }
+  
+  state.platformLaunchQuarter = platformLaunch;
+  
+  const lastPeriod = state.historicalData[state.historicalData.length - 1].period;
+  const forecastPeriods = generateQuarters(lastPeriod, forecastQuarters + 1).slice(1);
+  const baseOffset = state.historicalData.length;
+  
+  const forecasts = {
+    periods: forecastPeriods,
+    baseline: [],
+    conservative: [],
+    moderate: [],
+    aggressive: [],
+    // --- (新) 建立儲存 "當季增量" 的陣列 ---
+    cons_quarterly_incr: [],
+    mod_quarterly_incr: [],
+    agg_quarterly_incr: []
+  };
+  
+  // --- (新) 獲取 t=0 的基線值 ---
+  const lastHistorical = state.historicalData[state.historicalData.length - 1];
+  let prevBaseline = lastHistorical.accounts;
+  let prevCons = lastHistorical.accounts;
+  let prevMod = lastHistorical.accounts;
+  let prevAgg = lastHistorical.accounts;
+  
+  // 處理 t=0 可能是無效值的情況
+  if (!isFinite(prevBaseline)) {
+      prevBaseline = gompertzModel(baseOffset - 1, state.fittedParams.K, state.fittedParams.b, state.fittedParams.t0);
+      prevCons = prevBaseline;
+      prevMod = prevBaseline;
+      prevAgg = prevBaseline;
+  }
+  
+  // --- (新) 修改迴圈，一次算完所有值 ---
+  for (let i = 0; i < forecastQuarters; i++) {
+    const t = baseOffset + i;
+    
+    // 1. 計算累計總數
+    const baseline = gompertzModel(t, state.fittedParams.K, state.fittedParams.b, state.fittedParams.t0);
+    const conservative = applyIntervention(t, baseline, state.fittedParams, state.scenarioParams.conservative, baseOffset + platformLaunch);
+    const moderate = applyIntervention(t, baseline, state.fittedParams, state.scenarioParams.moderate, baseOffset + platformLaunch);
+    const aggressive = applyIntervention(t, baseline, state.fittedParams, state.scenarioParams.aggressive, baseOffset + platformLaunch);
+    
+    // 2. 儲存累計總數
+    forecasts.baseline.push(baseline);
+    forecasts.conservative.push(conservative);
+    forecasts.moderate.push(moderate);
+    forecasts.aggressive.push(aggressive);
+    
+    // 3. 計算並儲存 "當季增量"
+    const baselineQuarterlyAdd = (isFinite(baseline) && isFinite(prevBaseline)) ? (baseline - prevBaseline) : NaN;
+    const consQuarterlyAdd = (isFinite(conservative) && isFinite(prevCons)) ? (conservative - prevCons) : NaN;
+    const modQuarterlyAdd = (isFinite(moderate) && isFinite(prevMod)) ? (moderate - prevMod) : NaN;
+    const aggQuarterlyAdd = (isFinite(aggressive) && isFinite(prevAgg)) ? (aggressive - prevAgg) : NaN;
+
+    forecasts.cons_quarterly_incr.push((isFinite(consQuarterlyAdd) && isFinite(baselineQuarterlyAdd)) ? Math.max(0, consQuarterlyAdd - baselineQuarterlyAdd) : NaN);
+    forecasts.mod_quarterly_incr.push((isFinite(modQuarterlyAdd) && isFinite(baselineQuarterlyAdd)) ? Math.max(0, modQuarterlyAdd - baselineQuarterlyAdd) : NaN);
+    forecasts.agg_quarterly_incr.push((isFinite(aggQuarterlyAdd) && isFinite(baselineQuarterlyAdd)) ? Math.max(0, aggQuarterlyAdd - baselineQuarterlyAdd) : NaN);
+    
+    // 4. 更新 "前一季" 的值
+    prevBaseline = baseline;
+    prevCons = conservative;
+    prevMod = moderate;
+    prevAgg = aggressive;
+  }
+  
+  state.forecastData = forecasts;
+  
+  goToStep(4);
+  displayForecastChart();
+  displayIncrementalChart(); 
+  displayForecastTable();
+}
 
 function displayForecastChart() {
   const ctx = document.getElementById('forecastChart').getContext('2d');
