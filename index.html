@@ -2474,39 +2474,62 @@ function displayForecastTable() {
 }
 
 function exportCSV() {
-  // --- 修改：欄位名稱改為 "當季增量" ---
-  let csv = '期間,基線,保守型,保守(當季)增量,穩健型,穩健(當季)增量,積極型,積極(當季)增量\n';
+  // 1. 建立一個包含 "所有" 欄位的標頭
+  const headers = [
+    "期間",
+    "狀態",
+    "歷史(實際/插值)",
+    "基線(累計)",
+    "保守型(累計)",
+    "保守(當季)增量",
+    "穩健型(累計)",
+    "穩健(當季)增量",
+    "積極型(累計)",
+    "積極(當季)增量"
+  ];
+  let csv = headers.join(',') + '\n';
   
-  const n = state.forecastData.periods.length;
-  for (let i = 0; i < n; i++) {
+  const formatSafe = (val) => isFinite(val) ? val.toFixed(0) : 'N/A';
+  
+  // --- 2. 迴圈 1: 匯出 "歷史" 數據 ---
+  for (const row of state.historicalData) {
+    const period = row.period;
+    const status = row.dataType; // e.g., 'Original', 'Interpolated', 'Missing (Gap)'
+    const historicalValue = row.isMissing ? 'N/A' : formatSafe(row.accounts);
     
-    // --- (新) 簡化：直接從 state 讀取所有值 ---
-    const baseline = state.forecastData.baseline[i];
-    const conservative = state.forecastData.conservative[i];
-    const moderate = state.forecastData.moderate[i];
-    const aggressive = state.forecastData.aggressive[i];
+    // 預測欄位用 'N/A' 填充
+    const forecastPlaceholders = new Array(headers.length - 3).fill('N/A').join(',');
     
-    const consIncr = state.forecastData.cons_quarterly_incr[i];
-    const modIncr = state.forecastData.mod_quarterly_incr[i];
-    const aggIncr = state.forecastData.agg_quarterly_incr[i];
-    
-    const baselineStr = isFinite(baseline) ? baseline.toFixed(0) : 'N/A';
-    const conservativeStr = isFinite(conservative) ? conservative.toFixed(0) : 'N/A';
-    const moderateStr = isFinite(moderate) ? moderate.toFixed(0) : 'N/A';
-    const aggressiveStr = isFinite(aggressive) ? aggressive.toFixed(0) : 'N/A';
-    const consIncrStr = isFinite(consIncr) ? consIncr.toFixed(0) : 'N/A';
-    const modIncrStr = isFinite(modIncr) ? modIncr.toFixed(0) : 'N/A';
-    const aggIncrStr = isFinite(aggIncr) ? aggIncr.toFixed(0) : 'N/A';
-    
-    csv += `${state.forecastData.periods[i]},${baselineStr},${conservativeStr},${consIncrStr},${moderateStr},${modIncrStr},${aggressiveStr},${aggIncrStr}\n`;
+    csv += `${period},${status},${historicalValue},${forecastPlaceholders}\n`;
   }
   
-  const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+  // --- 3. 迴圈 2: 匯出 "預測" 數據 ---
+  const n = state.forecastData.periods.length;
+  for (let i = 0; i < n; i++) {
+    const period = state.forecastData.periods[i];
+    const status = 'Forecast'; // 標記為預測
+    const historicalValue = 'N/A'; // 歷史欄位用 'N/A' 填充
+    
+    // 讀取已算好的預測值
+    const baseline = formatSafe(state.forecastData.baseline[i]);
+    const conservative = formatSafe(state.forecastData.conservative[i]);
+    const consIncr = formatSafe(state.forecastData.cons_quarterly_incr[i]);
+    const moderate = formatSafe(state.forecastData.moderate[i]);
+    const modIncr = formatSafe(state.forecastData.mod_quarterly_incr[i]);
+    const aggressive = formatSafe(state.forecastData.aggressive[i]);
+    const aggIncr = formatSafe(state.forecastData.agg_quarterly_incr[i]);
+    
+    csv += `${period},${status},${historicalValue},${baseline},${conservative},${consIncr},${moderate},${modIncr},${aggressive},${aggIncr}\n`;
+  }
+  
+  // --- 4. 下載邏輯 ---
+  const bom = new Uint8Array([0xEF, 0xBB, 0xBF]); // 確保 Excel 能正確開啟中文
   const blob = new Blob([bom, csv], { type: 'text/csv;charset=utf-8,' });
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
+  // (新) 更改檔案名稱
+  a.download = 'full_gompertz_dataset.csv';
   a.href = url;
-  a.download = 'forecast_data_quarterly_incremental.csv';
   a.click();
   window.URL.revokeObjectURL(url);
 }
