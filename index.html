@@ -2232,23 +2232,59 @@ function displayForecastChart() {
 } // displayForecastChart 結束的 }
 
 // --- 新增：增量效益直方圖 ---
+// --- 新增：增量效益直方圖 ---
 function displayIncrementalChart() {
   const ctx = document.getElementById('incrementalChart').getContext('2d');
 
-  // 安全地計算增量 (處理 NaN)
-  const safeIncremental = (scenario) => {
-    return state.forecastData[scenario].map((v, i) => {
-      const baseline = state.forecastData.baseline[i];
-      if (isFinite(v) && isFinite(baseline)) {
-        return Math.max(0, v - baseline); // 確保增量不為負
+  // --- (新) 邏輯：計算 "每季的" 增量效益 ---
+  const safeIncrementalQuarterly = (scenario) => {
+    const baselineData = state.forecastData.baseline;
+    const scenarioData = state.forecastData[scenario];
+    const results = [];
+
+    // 獲取歷史數據的最後一個點，作為 t=0 的比較基線
+    const lastHistorical = state.historicalData[state.historicalData.length - 1];
+    let prevBaseline = lastHistorical.accounts;
+    let prevScenario = lastHistorical.accounts;
+
+    // 處理最後一個歷史點可能是插值或無效的罕見情況
+    if (!isFinite(prevBaseline)) {
+        prevBaseline = gompertzModel(state.historicalData.length - 1, state.fittedParams.K, state.fittedParams.b, state.fittedParams.t0);
+        prevScenario = prevBaseline;
+    }
+
+    // 迭代預測數據
+    for (let i = 0; i < scenarioData.length; i++) {
+      const currentBaseline = baselineData[i];
+      const currentScenario = scenarioData[i];
+
+      if (!isFinite(currentBaseline) || !isFinite(currentScenario) || !isFinite(prevBaseline) || !isFinite(prevScenario)) {
+        results.push(null);
+      } else {
+        // 1. 計算基線的"當季"新增
+        const baselineQuarterlyAdd = currentBaseline - prevBaseline;
+        
+        // 2. 計算情境的"當季"新增
+        const scenarioQuarterlyAdd = currentScenario - prevScenario;
+        
+        // 3. 計算 "情境當季新增" - "基線當季新增"
+        const incrementalQuarterlyBenefit = scenarioQuarterlyAdd - baselineQuarterlyAdd;
+        
+        // 我們只顯示正向效益
+        results.push(Math.max(0, incrementalQuarterlyBenefit));
       }
-      return null; // 如果基線或情境值無效，則不顯示
-    });
+      
+      // 更新 "前一季" 的值，為下一次循環做準備
+      prevBaseline = currentBaseline;
+      prevScenario = currentScenario;
+    }
+    return results;
   };
+  // --- (新) 邏輯結束 ---
   
-  const incrementalConservative = safeIncremental('conservative');
-  const incrementalModerate = safeIncremental('moderate');
-  const incrementalAggressive = safeIncremental('aggressive');
+  const incrementalConservative = safeIncrementalQuarterly('conservative');
+  const incrementalModerate = safeIncrementalQuarterly('moderate');
+  const incrementalAggressive = safeIncrementalQuarterly('aggressive');
   
   if (incrementalChart) {
     incrementalChart.destroy();
@@ -2260,21 +2296,21 @@ function displayIncrementalChart() {
       labels: state.forecastData.periods,
       datasets: [
         {
-          label: '保守型增量',
+          label: '保守型 (當季增量)',
           data: incrementalConservative,
           backgroundColor: 'rgba(59, 130, 246, 0.6)',
           borderColor: '#3b82f6',
           borderWidth: 1
         },
         {
-          label: '穩健型增量',
+          label: '穩健型 (當季增量)',
           data: incrementalModerate,
           backgroundColor: 'rgba(16, 185, 129, 0.6)',
           borderColor: '#10b981',
           borderWidth: 1
         },
         {
-          label: '積極型增量',
+          label: '積極型 (當季增量)',
           data: incrementalAggressive,
           backgroundColor: 'rgba(239, 68, 68, 0.6)',
           borderColor: '#ef4444',
@@ -2298,7 +2334,7 @@ function displayIncrementalChart() {
         }
       },
       scales: {
-        x: { stacked: false }, // 改為 false (並排)
+        x: { stacked: false }, // 並排顯示
         y: { 
             stacked: false, 
             beginAtZero: true,
