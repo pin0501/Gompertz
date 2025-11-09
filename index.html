@@ -721,6 +721,23 @@ textarea.form-control {
   border: 1px solid rgba(var(--color-success-rgb), 0.2);
 }
 
+.param-input {
+  width: 100%;
+  background: var(--color-bg-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-base);
+  padding: var(--space-8);
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  font-family: var(--font-family-mono);
+}
+.param-input:focus {
+  background: var(--color-surface);
+  border-color: var(--color-primary);
+  outline: var(--focus-outline);
+}
+
    @media (max-width: 768px) {
   .container {
     padding: var(--space-16);
@@ -923,16 +940,16 @@ textarea.form-control {
                     <div id="parametersDisplay" style="display: none;">
                         <div class="params-grid">
                             <div class="param-card">
-                                <div class="param-label">K (承載容量)</div>
-                                <div class="param-value" id="paramK">-</div>
+                                <div class="param-label">K (承載容量 / TAM)</div>
+                                <input type="number" class="param-input" id="inputParamK">
                             </div>
                             <div class="param-card">
                                 <div class="param-label">b (成長率)</div>
-                                <div class="param-value" id="paramB">-</div>
+                                <input type="number" step="0.001" class="param-input" id="inputParamB">
                             </div>
                             <div class="param-card">
                                 <div class="param-label">t₀ (轉折點)</div>
-                                <div class="param-value" id="paramT0">-</div>
+                                <input type="number" step="0.01" class="param-input" id="inputParamT0">
                             </div>
                         </div>
                     </div>
@@ -1606,9 +1623,9 @@ function performFitting() {
     
     state.fittedParams = result.params;
     
-    document.getElementById('paramK').textContent = formatNumber(result.params.K);
-    document.getElementById('paramB').textContent = result.params.b.toFixed(4);
-    document.getElementById('paramT0').textContent = result.params.t0.toFixed(2);
+    document.getElementById('inputParamK').value = Math.round(result.params.K);
+    document.getElementById('inputParamB').value = result.params.b.toFixed(4);
+    document.getElementById('inputParamT0').value = result.params.t0.toFixed(2);
     
     if (result.r2 > 0.95) {
       statusEl.innerHTML = '✔ 擬合成功！R² = ' + result.r2.toFixed(4) + ' (優異)';
@@ -2078,15 +2095,46 @@ document.addEventListener('DOMContentLoaded', () => {
   
   document.getElementById('backToStep1').addEventListener('click', () => goToStep(1));
   document.getElementById('proceedToStep3').addEventListener('click', () => {
-    goToStep(3);
-
-    // --- 新增：動態更新啟動季度標籤 ---
-    const lastPeriod = state.historicalData[state.historicalData.length - 1].period;
-    const firstFuturePeriod = getNextQuarter(lastPeriod);
-    document.getElementById('launchQuarterLabel').textContent = `（${firstFuturePeriod} = 季度 1）`;
-    // --- 新增結束 ---
-
-    initializeSliders();
+    try {
+      // 讀取並驗證用戶手動修改的參數
+      const newK = parseFloat(document.getElementById('inputParamK').value);
+      const newB = parseFloat(document.getElementById('inputParamB').value);
+      const newT0 = parseFloat(document.getElementById('inputParamT0').value);
+  
+      const validData = state.historicalData.filter(d => !d.isMissing);
+      const maxAccounts = Math.max(...validData.map(d => d.accounts));
+  
+      if (!isFinite(newK) || !isFinite(newB) || !isFinite(newT0)) {
+        throw new Error('所有參數都必須是有效的數字。');
+      }
+      if (newK <= maxAccounts) {
+        throw new Error(`K (承載容量) 必須大於歷史最大值 (${formatNumber(maxAccounts)})。`);
+      }
+      if (newB <= 0 || newB > 2.0) { // 允許 b 稍微大於 1
+        throw new Error('b (成長率) 必須是 (0, 2.0] 之間的數字。');
+      }
+  
+      // 將用戶手動修改後的參數儲存回 state
+      state.fittedParams.K = newK;
+      state.fittedParams.b = newB;
+      state.fittedParams.t0 = newT0;
+  
+      showToast('✓ 手動參數已儲存。');
+      
+      // --- 驗證通過，繼續執行 ---
+      goToStep(3);
+  
+      // 動態更新啟動季度標籤
+      const lastPeriod = state.historicalData[state.historicalData.length - 1].period;
+      const firstFuturePeriod = getNextQuarter(lastPeriod);
+      document.getElementById('launchQuarterLabel').textContent = `（${firstFuturePeriod} = 季度 1）`;
+  
+      initializeSliders();
+  
+    } catch (error) {
+      // 如果驗證失敗，則彈出提示並停留在步驟 2
+      alert(`無法繼續: ${error.message}`);
+    }
   });
   
   document.querySelectorAll('.scenario-preset').forEach(btn => {
