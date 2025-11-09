@@ -942,6 +942,7 @@ textarea.form-control {
                           <div class="param-card">
                               <div class="param-label">K (承載容量 / TAM)</div>
                               <input type="number" class="param-input" id="inputParamK">
+                              <button class="btn btn--secondary btn--sm" id="refitKBtn" style="margin-top: var(--space-8); width: 100%;">固定 K 並重新擬合 b, t₀</button>
                           </div>
                           <div class="param-card">
                               <div class="param-label">b (成長率)</div>
@@ -1293,6 +1294,58 @@ function fitGompertzCurve(data) {
     rmse: isFinite(rmse) ? rmse : Infinity,
     valid: isFinite(r2)
   };
+} // fitGompertzCurve 結束的 }
+
+// --- 新增：固定 K 並重新擬合 b, t0 ---
+function refitWithFixedK(fixedK) {
+  const validData = state.historicalData.filter(d => !d.isMissing);
+  const data = validData.map(d => d.accounts);
+  const n = data.length;
+  
+  if (!isFinite(fixedK) || fixedK <= Math.max(...data)) {
+    alert(`K (承載容量) 必須大於歷史最大值 (${formatNumber(Math.max(...data))})。`);
+    return null;
+  }
+
+  let bestParams = null;
+  let bestError = Infinity;
+  
+  // 移除 K 迴圈，只搜尋 b 和 t0
+  const b_steps = [0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5];
+  const t0_steps = [-5, -2, 0, n * 0.3, n * 0.5, n * 0.7, n + 2, n + 5];
+  
+  for (const b of b_steps) {
+    if (b <= 0 || b > 2.0) continue;
+    
+    for (const t0 of t0_steps) {
+      let error = 0;
+      let hasNaN = false;
+      
+      for (let i = 0; i < n; i++) {
+        const predicted = gompertzModel(i, fixedK, b, t0);
+        if (!isFinite(predicted)) {
+          hasNaN = true;
+          break;
+        }
+        error += Math.pow(data[i] - predicted, 2);
+      }
+      
+      if (!hasNaN && isFinite(error) && error < bestError) {
+        bestError = error;
+        bestParams = { K: fixedK, b, t0 };
+      }
+    }
+  }
+
+  if (!bestParams) {
+    alert('重新擬合失敗。請嘗試調整 K 值。');
+    return null;
+  }
+  
+  // 計算 R²
+  const r2 = calculateR2(data, bestParams);
+  
+  return { params: bestParams, r2 };
 }
 
 function applyIntervention(t, baselineValue, params, interventionParams, launchQuarter) {
@@ -1733,31 +1786,16 @@ function displayFittingChart() {
         return; // 如果輸入無效 (例如空的)，則不更新
       }
       
-      // 更新 state
+      // 僅更新 state 和圖表
       state.fittedParams.K = newK;
       state.fittedParams.b = newB;
       state.fittedParams.t0 = newT0;
-
-      // 重畫圖表
       displayFittingChart();
       
-      // 重新計算 R² 並更新狀態
-      const validData = state.historicalData.filter(d => !d.isMissing).map(d => d.accounts);
-      const newR2 = calculateR2(validData, state.fittedParams);
-      const statusEl = document.getElementById('fittingStatus');
-      
-      statusEl.innerHTML = `⚠️ 手動調整模式 (R² = ${newR2.toFixed(4)})`;
-      if (newR2 > 0.9) {
-        statusEl.style.color = 'var(--color-success)';
-      } else {
-        statusEl.style.color = 'var(--color-warning)';
-      }
-      
     } catch (e) {
-      // 如果解析失敗則不執行
       console.error("Error updating manual params:", e);
     }
-  }  
+  }
 
 // ======================================
 // 6.5. INTERPOLATION FUNCTIONS (新增)
@@ -2243,8 +2281,28 @@ document.getElementById('exportCSVBtn').addEventListener('click', exportCSV);
   });
 
   document.getElementById('applyInterpolationBtn').addEventListener('click', applyInterpolation);
+  
+  // --- 新增：重新擬合按鈕 ---
+  document.getElementById('refitKBtn').addEventListener('click', () => {
+    const newK = parseFloat(document.getElementById('inputParamK').value);
+    const result = refitWithFixedK(newK);
+    
+    if (result) {
+      // 擬合成功，更新 state 和輸入框
+      state.fittedParams = result.params;
+      document.getElementById('inputParamB').value = result.params.b.toFixed(4);
+      document.getElementById('inputParamT0').value = result.params.t0.toFixed(2);
+      
+      // 更新圖表和狀態
+      displayFittingChart();
+      const statusEl = document.getElementById('fittingStatus');
+      statusEl.innerHTML = `✓ 已固定 K 重新擬合 (R² = ${result.r2.toFixed(4)})`;
+      statusEl.style.color = 'var(--color-success)';
+      showToast('✓ 已固定 K 重新擬合 b, t₀');
+    }
+  });
+  // --- 新增結束 ---
 
-  // --- 新增：監聽參數輸入框的變化 ---
   document.getElementById('inputParamK').addEventListener('input', updateManualParamsAndChart);
   document.getElementById('inputParamB').addEventListener('input', updateManualParamsAndChart);
   document.getElementById('inputParamT0').addEventListener('input', updateManualParamsAndChart);
