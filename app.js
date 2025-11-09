@@ -63,6 +63,18 @@ function generateQuarters(startQuarter, numQuarters) {
   return quarters;
 }
 
+function getNextQuarter(periodStr) {
+  const parsed = parseQuarter(periodStr);
+  if (!parsed) return null;
+  let { quarter, year } = parsed;
+  quarter++;
+  if (quarter > 4) {
+    quarter = 1;
+    year++;
+  }
+  return `Q${quarter} ${year}`;
+}
+
 // Safe Gompertz model functions with numerical stability
 function gompertzModel(t, K, b, t0) {
   // Validate inputs
@@ -395,6 +407,7 @@ function loadSampleData() {
   parseAndDisplayData();
 }
 
+// 修正後的 parseAndDisplayData 函式
 function parseAndDisplayData() {
   const dataInput = document.getElementById('dataInput').value;
   const lines = dataInput.trim().split('\n');
@@ -414,35 +427,80 @@ function parseAndDisplayData() {
       const period = parts[0].trim();
       const accountsStr = parts[1].trim();
       
-      // Handle missing data markers
+      // --- FIX 1: 修正缺漏值判斷邏輯 ---
       let accounts = null;
       let isMissing = false;
       
-      if (accountsStr === '' || accountsStr === '-' || accountsStr.toLowerCase() === 'null' || accountsStr.toLowerCase() === 'na') {
+      // 明確的缺漏標記 (包含 'x')
+      if (accountsStr === '' || accountsStr === '-' || accountsStr.toLowerCase() === 'null' || accountsStr.toLowerCase() === 'na' || accountsStr.toLowerCase() === 'x') {
         isMissing = true;
       } else {
         accounts = parseFloat(accountsStr);
         if (isNaN(accounts)) {
-          throw new Error(`無效的帳戶數: ${accountsStr}`);
-        }
-        if (accounts < 0) {
+          // 如果不是數字 (例如 'X' 或其他文字)，也視為缺漏
+          accounts = null;
+          isMissing = true;
+        } else if (accounts < 0) {
+          // 負數是無效數據，拋出錯誤
           throw new Error(`帳戶數不能為負數: ${accountsStr}`);
         }
       }
+      // --- END OF FIX 1 ---
       
       data.push({ period, accounts, isMissing, dataType: isMissing ? 'Missing' : 'Original' });
     }
     
-    if (data.length < 8) {
-      throw new Error('至少需要 8 個數據點進行擬合');
+    // --- FIX 2: 填補時間序列間隙 ---
+    if (data.length < 2) {
+      if (data.length === 0) throw new Error('請輸入數據');
+      state.historicalData = data; // 只有一個點，無法檢查間隙
+    } else {
+      const filledData = [];
+      // 使用 Map 方便快速查找
+      const dataMap = new Map(data.map(d => [d.period, d]));
+      
+      let currentPeriod = data[0].period;
+      const lastPeriod = data[data.length - 1].period;
+      
+      filledData.push(data[0]); // 加入第一個點
+      
+      let safetyBreak = 0; // 防止無限迴圈 (50年*4季=200)
+      while (currentPeriod !== lastPeriod && safetyBreak < 200) {
+          const nextPeriod = getNextQuarter(currentPeriod);
+          if (!nextPeriod) {
+            console.error('無法從 ' + currentPeriod + ' 解析下一個季度');
+            break; 
+          }
+          
+          if (dataMap.has(nextPeriod)) {
+              // 數據中存在這一季，加入
+              filledData.push(dataMap.get(nextPeriod));
+          } else {
+              // 數據中不存在，此為時間間隙，補上缺漏值
+              filledData.push({
+                  period: nextPeriod,
+                  accounts: null,
+                  isMissing: true,
+                  dataType: 'Missing (Gap)'
+              });
+          }
+          currentPeriod = nextPeriod;
+          safetyBreak++;
+      }
+      state.historicalData = filledData;
+    }
+    // --- END OF FIX 2 ---
+
+    if (state.historicalData.length < 8) {
+      throw new Error('總數據點（包含填補的間隙）少於 8 個');
     }
     
-    state.historicalData = data;
+    // state.historicalData = data; // <-- 舊的程式碼
     
-    // Perform data quality analysis
+    // 現在 `analyzeDataQuality` 會收到包含所有間隙的完整數據
     analyzeDataQuality();
     displayDataQualityReport();
-    displayDataPreview(data);
+    displayDataPreview(state.historicalData);
     
     errorEl.style.display = 'none';
     
