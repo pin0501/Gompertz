@@ -975,7 +975,7 @@ textarea.form-control {
                     </div>
 
                     <div class="form-group">
-                        <label class="form-label" for="platformLaunch">平台啟動季度（Q1 2025 = 季度 1）</label>
+                        <label class="form-label" for="platformLaunch">平台啟動季度 <span id="launchQuarterLabel">（Q1 2025 = 季度 1）</span></label>
                         <input type="number" class="form-control" id="platformLaunch" value="3" min="1">
                     </div>
                 </div>
@@ -2079,6 +2079,13 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('backToStep1').addEventListener('click', () => goToStep(1));
   document.getElementById('proceedToStep3').addEventListener('click', () => {
     goToStep(3);
+
+    // --- 新增：動態更新啟動季度標籤 ---
+    const lastPeriod = state.historicalData[state.historicalData.length - 1].period;
+    const firstFuturePeriod = getNextQuarter(lastPeriod);
+    document.getElementById('launchQuarterLabel').textContent = `（${firstFuturePeriod} = 季度 1）`;
+    // --- 新增結束 ---
+
     initializeSliders();
   });
   
