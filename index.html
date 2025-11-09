@@ -1434,63 +1434,57 @@ function applyIntervention(t, baselineValue, params, interventionParams, launchQ
   if (t < launchQuarter) return baselineValue;
 
   const { K, b, t0 } = params;
-  // --- (新) 取得 peak_quarter 參數 ---
   const { alpha, delta_t, kappa, half_life, peak_quarter } = interventionParams;
   const tSinceLaunch = t - launchQuarter;
   
-  // --- (新) 邏輯: 爬升 (Ramp-up) + 衰減 (Decay) ---
-  let effectFactor = 0;
+  // --- 1. 臨時效應因子 (用於 alpha, delta_t) ---
+  // 這個因子會爬升到高峰，然後根據半衰期 H "衰減"
+  let temporaryEffectFactor = 0;
   if (tSinceLaunch < peak_quarter) {
-    // 1. 爬升期: 從 0 線性爬升到 1 (在 peak_quarter 達到 1)
-    // 我們使用 (t+1)/(P+1) 來避免 t=0, P=0 的情況
-    effectFactor = (tSinceLaunch + 1) / (peak_quarter + 1);
+    // 爬升期: 從 0 線性爬升到 1
+    temporaryEffectFactor = (tSinceLaunch + 1) / (peak_quarter + 1);
   } else {
-    // 2. 衰減期: 從 peak_quarter 開始，使用半衰期 H 進行指數衰減
+    // 衰減期: 從 peak_quarter 開始，使用 H 衰減
     const tSincePeak = tSinceLaunch - peak_quarter;
     const decayExponent = -Math.log(2) * tSincePeak / half_life;
     const clampedExp = Math.max(-100, Math.min(0, decayExponent));
-    effectFactor = Math.exp(clampedExp); // 在 peak_quarter 時, tSincePeak=0, effectFactor=1
+    temporaryEffectFactor = Math.exp(clampedExp); // 在 peak_quarter 時 = 1
   }
   
+  // --- 2. 永久效應因子 (用於 kappa) ---
+  // 這個因子會爬升到高峰，然後 "保持" 在 1
+  let permanentEffectFactor = 0;
+  if (tSinceLaunch < peak_quarter) {
+    // 爬升期: 從 0 線性爬升到 1
+    permanentEffectFactor = (tSinceLaunch + 1) / (peak_quarter + 1);
+  } else {
+    // 保持期: 永遠保持在 1
+    permanentEffectFactor = 1; 
+  }
+
+  // --- 3. 組合參數 ---
+  
+  // Alpha (加速) & Delta_t (前移) 是 "臨時" 效應
   const cappedAlpha = Math.min(0.5, Math.max(0, alpha));
-  const accelerationFactor = 1 + cappedAlpha * effectFactor; // 套用效應
+  const accelerationFactor = 1 + cappedAlpha * temporaryEffectFactor;
   
-  // --- 2. 上限擴張 (K) ---
-  // 為了簡化，我們讓 K 和 t0 的效應也跟隨 P 和 H 的曲線
-  const cappedKappa = Math.min(0.2, Math.max(0, kappa));
-  const expansionSmoother = effectFactor; // (舊: 1 - decayFactor)
-  const capacityFactor = 1 + cappedKappa * expansionSmoother;
-  
-  // --- 3. 拐點前移 (t0) ---
   const cappedDeltaT = Math.min(5, Math.max(0, delta_t));
-  const shiftSmoother = effectFactor; // (舊: 1 - decayFactor)
-  const adjustedT0_shift = cappedDeltaT * shiftSmoother;
+  const adjustedT0_shift = cappedDeltaT * temporaryEffectFactor;
   
-  // --- 組合參數 ---
-  const adjustedK = K * capacityFactor;
-  const adjustedB = b * accelerationFactor;
-  const adjustedT0 = t0 - adjustedT0_shift;
+  // Kappa (TAM擴張) 是 "永久" 效應
+  const cappedKappa = Math.min(0.2, Math.max(0, kappa));
+  const capacityFactor = 1 + cappedKappa * permanentEffectFactor;
+  
+  // --- 4. 應用 ---
+  const adjustedK = K * capacityFactor; // 永久抬高天花板
+  const adjustedB = b * accelerationFactor; // 臨時加速
+  const adjustedT0 = t0 - adjustedT0_shift; // 臨時前移
 
   const result = gompertzModel(t, adjustedK, adjustedB, adjustedT0);
   
-  // 確保介入結果不會低於基線
+  // (註: 我們保留 generateForecasts 中的 Math.max(0,...) 作為最後的保險)
+  // 但這裡的 baselineValue 參數是用於防止介入曲線低於基線 *總數*
   return isFinite(result) ? Math.max(baselineValue, result) : baselineValue;
-}
-
-// ======================================
-// 4. NAVIGATION & STEP CONTROL
-// ======================================
-function goToStep(step) {
-  for (let i = 1; i <= 4; i++) {
-    document.getElementById(`step${i}`).style.display = 'none';
-    const stepEl = document.querySelector(`.step[data-step="${i}"]`);
-    stepEl.classList.remove('active', 'completed');
-    if (i < step) stepEl.classList.add('completed');
-  }
-  
-  document.getElementById(`step${step}`).style.display = 'block';
-  document.querySelector(`.step[data-step="${step}"]`).classList.add('active');
-  state.currentStep = step;
 }
 
 // ======================================
