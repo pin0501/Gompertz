@@ -1235,11 +1235,15 @@ function showToast(message, duration = 3000) {
 }
 
 // --- 新增：遺失的頁面導航函式 ---
+// --- 修正：頁面導航函式 ---
 function goToStep(stepNumber) {
-  document.querySelectorAll('.step-page').forEach(page => {
-    page.style.display = 'none';
-  });
+  // --- (新) 修正的邏輯：直接透過 ID 隱藏所有步驟 ---
+  document.getElementById('step1').style.display = 'none';
+  document.getElementById('step2').style.display = 'none';
+  document.getElementById('step3').style.display = 'none';
+  document.getElementById('step4').style.display = 'none';
   
+  // (不變) 顯示當前步驟
   const stepPage = document.getElementById('step' + stepNumber);
   if (stepPage) {
     stepPage.style.display = 'block';
@@ -1247,7 +1251,7 @@ function goToStep(stepNumber) {
     console.error('找不到步驟頁面: step' + stepNumber);
   }
   
-  // 更新頂部的步驟指示器
+  // (不變) 更新頂部的步驟指示器
   document.querySelectorAll('.step-indicator').forEach(indicator => {
     indicator.classList.remove('active');
     const indicatorStep = parseInt(indicator.getAttribute('data-step') || '0');
