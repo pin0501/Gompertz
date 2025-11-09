@@ -2178,28 +2178,32 @@ function generateForecasts() {
     conservative: [],
     moderate: [],
     aggressive: [],
-    // --- (新) 建立儲存 "當季增量" 的陣列 ---
     cons_quarterly_incr: [],
     mod_quarterly_incr: [],
     agg_quarterly_incr: []
   };
   
-  // --- (新) 獲取 t=0 的基線值 ---
-  const lastHistorical = state.historicalData[state.historicalData.length - 1];
-  let prevBaseline = lastHistorical.accounts;
-  let prevCons = lastHistorical.accounts;
-  let prevMod = lastHistorical.accounts;
-  let prevAgg = lastHistorical.accounts;
+  // --- (新) 修正後的 t=0 初始化 ---
+  // 我們 *必須* 使用 *擬合* 的基線值 (t = baseOffset - 1，即最後一個歷史點) 
+  // 作為所有比較的 "前一季" 基準點
+  let prevBaseline = gompertzModel(baseOffset - 1, state.fittedParams.K, state.fittedParams.b, state.fittedParams.t0);
   
-  // 處理 t=0 可能是無效值的情況
+  // 在介入開始前，所有情境的 "前一季" 都等於基線
+  let prevCons = prevBaseline;
+  let prevMod = prevBaseline;
+  let prevAgg = prevBaseline;
+
+  // 處理罕見的擬合失敗 (例如 K, b, t0 無效)
   if (!isFinite(prevBaseline)) {
-      prevBaseline = gompertzModel(baseOffset - 1, state.fittedParams.K, state.fittedParams.b, state.fittedParams.t0);
-      prevCons = prevBaseline;
-      prevMod = prevBaseline;
-      prevAgg = prevBaseline;
+      // 回退到使用最後一個有效的 "實際" 數字
+      const lastValidAccount = state.historicalData.filter(d => !d.isMissing).pop()?.accounts || 0;
+      prevBaseline = lastValidAccount;
+      prevCons = lastValidAccount;
+      prevMod = lastValidAccount;
+      prevAgg = lastValidAccount;
   }
+  // --- (新) 修正結束 ---
   
-  // --- (新) 修改迴圈，一次算完所有值 ---
   for (let i = 0; i < forecastQuarters; i++) {
     const t = baseOffset + i;
     
