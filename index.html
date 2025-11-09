@@ -778,29 +778,60 @@ textarea.form-control {
                 </div>
             </div>
 
-            <div class="card" id="dataPreviewCard" style="display: none;">
+            <div class="card" id="missingDataCard" style="display: none;">
                 <div class="card__header">
-                    <h3>數據預覽</h3>
+                    <h3>缺漏數據處理</h3>
                 </div>
                 <div class="card__body">
-                    <div class="table-container">
-                        <table class="data-table" id="dataPreviewTable">
-                            <thead>
-                                <tr>
-                                    <th>期間</th>
-                                    <th>實際數值</th>
-                                    <th>狀態</th>
-                                </tr>
-                            </thead>
-                            <tbody></tbody>
-                        </table>
+                    <p style="color: var(--color-text-secondary); margin-bottom: var(--space-16);">偵測到數據缺漏。請選擇一種處理方法：</p>
+                    
+                    <div class="interpolation-options">
+                        <div class="interpolation-option">
+                            <input type="radio" id="interp_ignore" name="interpolation" value="ignore" checked>
+                            <label for="interp_ignore">
+                                忽略 (Ignore)
+                                <span>跳過缺漏季度 (適用於 1-2 個缺漏)</span>
+                            </label>
+                        </div>
+                        <div class="interpolation-option">
+                            <input type="radio" id="interp_linear" name="interpolation" value="linear">
+                            <label for="interp_linear">
+                                線性插值 (Linear)
+                                <span>在相鄰值之間繪製直線</span>
+                            </label>
+                        </div>
+                        <div class="interpolation-option">
+                            <input type="radio" id="interp_gompertz" name="interpolation" value="gompertz">
+                            <label for="interp_gompertz">
+                                Gompertz 插值
+                                <span>使用初步擬合估計缺漏值 - 最適合成長數據</span>
+                            </label>
+                        </div>
+                        <div class="interpolation-option">
+                            <input type="radio" id="interp_forward" name="interpolation" value="forward">
+                            <label for="interp_forward">
+                                向前填充 (Forward-Fill)
+                                <span>重複前一個值 (保守方法)</span>
+                            </label>
+                        </div>
                     </div>
-                    <div id="dataError" class="error-message" style="display: none;"></div>
+                    
+                    <div class="impact-box" id="interpolationImpact" style="display: none;">
+                        <h4>方法說明</h4>
+                        <p>跳過缺漏季度。如果缺漏較少（1-2個），這是可行的簡單方法。</p>
+                    </div>
+                    
+                    <button class="btn btn--secondary" id="applyInterpolationBtn" style="margin-top: var(--space-16);">套用方法</button>
                 </div>
             </div>
 
-            <div class="action-buttons">
-                <button class="btn btn--primary" id="validateDataBtn">驗證並繼續</button>
+            <div class="card" id="bestPracticesCard" style="display: none;">
+                <div class="card__header">
+                    <h3>💡 最佳實踐</h3>
+                </div>
+                <div class="card__body">
+                    <p style="margin: 0;"><strong>Gompertz 插值</strong> 通常是 S 型成長數據最準確的方法。<strong>線性插值</strong> 適用於趨勢穩定的時期。<strong>忽略</strong> 則會導致擬合時使用較少的數據點。</p>
+                </div>
             </div>
         </div>
 
@@ -1002,7 +1033,8 @@ const state = {
     moderate: { alpha: 0.20, half_life: 8 },
     aggressive: { alpha: 0.35, half_life: 10 }
   },
-  platformLaunchQuarter: 3
+  platformLaunchQuarter: 3,
+  interpolationMethod: 'ignore', // <-- 新增這一行
 };
 
 let fittingChart = null;
