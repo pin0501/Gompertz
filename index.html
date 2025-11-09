@@ -675,9 +675,53 @@ textarea.form-control {
 }
 
 /* ========================================
-   9. RESPONSIVE DESIGN
+   9. NEW INTERPOLATION STYLES
    ======================================== */
-@media (max-width: 768px) {
+.status-badge.interpolated {
+  background: rgba(var(--color-teal-500-rgb), 0.15);
+  color: var(--color-primary);
+}
+
+.interpolation-options {
+  display: grid;
+  gap: var(--space-12);
+}
+
+.interpolation-option {
+  display: flex;
+  align-items: flex-start;
+  padding: var(--space-12);
+  border-radius: var(--radius-base);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-1);
+}
+
+.interpolation-option input {
+  margin-top: var(--space-4);
+  margin-right: var(--space-12);
+}
+
+.interpolation-option label {
+  margin: 0;
+  font-weight: var(--font-weight-medium);
+}
+
+.interpolation-option label span {
+  display: block;
+  font-weight: var(--font-weight-normal);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.impact-box {
+  margin-top: var(--space-16);
+  padding: var(--space-12);
+  border-radius: var(--radius-base);
+  background: var(--color-bg-3);
+  border: 1px solid rgba(var(--color-success-rgb), 0.2);
+}
+
+   @media (max-width: 768px) {
   .container {
     padding: var(--space-16);
   }
@@ -1391,36 +1435,16 @@ function displayDataQualityReport() {
   `).join('');
   
   card.style.display = 'block';
-}
 
-function displayDataPreview(data) {
-  const tbody = document.querySelector('#dataPreviewTable tbody');
-  tbody.innerHTML = '';
-  
-  data.forEach((row) => {
-    const tr = document.createElement('tr');
-    
-    let statusBadge;
-    let valueDisplay;
-    
-    // 根據 isMissing 屬性來決定顯示內容
-    if (row.isMissing) {
-        statusBadge = '<span class="status-badge missing">⚠️ 缺漏</span>';
-        valueDisplay = '<em style="color: var(--color-text-secondary);">N/A</em>';
-    } else {
-        statusBadge = '<span class="status-badge valid">✓ 正常</span>';
-        valueDisplay = formatNumber(row.accounts);
-    }
-    
-    tr.innerHTML = `
-      <td>${row.period}</td>
-      <td>${valueDisplay}</td>
-      <td>${statusBadge}</td>
-    `;
-    tbody.appendChild(tr);
-  });
-  
-  document.getElementById('dataPreviewCard').style.display = 'block';
+  // --- 新增：顯示/隱藏插值卡片 ---
+  if (quality.missingCount > 0) {
+    document.getElementById('missingDataCard').style.display = 'block';
+    document.getElementById('bestPracticesCard').style.display = 'block';
+  } else {
+    document.getElementById('missingDataCard').style.display = 'none';
+    document.getElementById('bestPracticesCard').style.display = 'none';
+  }
+  // --- 新增結束 ---
 }
 
 function validateAndProceed() {
@@ -1428,6 +1452,23 @@ function validateAndProceed() {
     alert('請先輸入或載入數據');
     return;
   }
+  
+  // --- 新增：插值檢查 ---
+  if (!state.dataQuality) {
+    analyzeDataQuality();
+  }
+  
+  const stillMissing = state.historicalData.filter(d => d.isMissing).length;
+  if (stillMissing > 0) {
+    if (state.interpolationMethod === 'ignore' || !state.interpolationMethod) {
+      if (!confirm(`仍有 ${stillMissing} 個缺漏值未處理。將在擬合時忽略這些點。確定要繼續嗎？`)) {
+        return;
+      }
+    }
+  }
+  // --- 新增結束 ---
+  
+  goToStep(2);
   goToStep(2);
   performFitting();
 }
@@ -1536,8 +1577,166 @@ function displayFittingChart() {
         }
       }
     }
-  });
+    });
+  } // displayFittingChart 結束的 }
+
+// ======================================
+// 6.5. INTERPOLATION FUNCTIONS (新增)
+// ======================================
+function applyInterpolation() {
+  const method = document.querySelector('input[name="interpolation"]:checked').value;
+  state.interpolationMethod = method;
+  
+  const data = state.historicalData;
+  const missingIndices = data.map((d, i) => d.isMissing ? i : -1).filter(i => i >= 0);
+  
+  if (missingIndices.length === 0) {
+    alert('沒有需要插值的數據');
+    return;
+  }
+  
+  if (method === 'ignore') {
+    alert('將在擬合時忽略缺漏數據點');
+    // 需要重置可能已插值的數據
+    data.forEach(d => {
+        if (d.dataType === 'Interpolated') {
+            d.isMissing = true;
+            d.accounts = null;
+            d.dataType = 'Missing (Gap)';
+        }
+    });
+  } else {
+    // Apply interpolation based on method
+    missingIndices.forEach(i => {
+      let interpolatedValue = null;
+      
+      if (method === 'linear') {
+        interpolatedValue = linearInterpolation(data, i);
+      } else if (method === 'gompertz') {
+        interpolatedValue = gompertzInterpolation(data, i);
+      } else if (method === 'forward') {
+        interpolatedValue = forwardFill(data, i);
+      }
+      
+      if (interpolatedValue !== null && isFinite(interpolatedValue)) {
+        data[i].accounts = interpolatedValue;
+        data[i].isMissing = false;
+        data[i].dataType = 'Interpolated';
+      }
+    });
+  }
+  
+  // 顯示插值影響
+  const oldScore = state.dataQuality ? state.dataQuality.score : 0;
+  
+  // Recalculate quality after interpolation
+  analyzeDataQuality();
+  displayDataQualityReport();
+  displayDataPreview(data);
+  
+  const newScore = state.dataQuality.score;
+  const improvement = newScore - oldScore;
+  const methodMap = getMethodName(method);
+  
+  const impactDiv = document.getElementById('interpolationImpact');
+  if (method === 'ignore') {
+    impactDiv.innerHTML = `
+      <h4>✓ 已重置</h4>
+      <p>已將 ${missingIndices.length} 個缺漏值標記為 "忽略"。</p>
+      <p>數據品質分數: <strong>${newScore}/100</strong></p>
+    `;
+  } else {
+    impactDiv.innerHTML = `
+      <h4>✓ 插值完成</h4>
+      <p>已使用 <strong>${methodMap}</strong> 填補 ${missingIndices.length} 個缺漏值。</p>
+      <p>數據品質分數: <strong>${oldScore}/100</strong> → <strong style="color: var(--color-success);">${newScore}/100</strong> ${improvement > 0 ? '(+' + improvement.toFixed(0) + ')' : ''}</p>
+    `;
+  }
+  impactDiv.style.display = 'block';
 }
+
+function getMethodName(method) {
+  const names = {
+    'linear': '線性插值',
+    'gompertz': 'Gompertz 插值',
+    'forward': '向前填充',
+    'ignore': '忽略'
+  };
+  return names[method] || method;
+}
+
+function linearInterpolation(data, index) {
+  // Find previous and next valid values
+  let prevIndex = -1, nextIndex = -1;
+  
+  for (let i = index - 1; i >= 0; i--) {
+    if (data[i].accounts !== null && !data[i].isMissing) {
+      prevIndex = i;
+      break;
+    }
+  }
+  
+  for (let i = index + 1; i < data.length; i++) {
+    if (data[i].accounts !== null && !data[i].isMissing) {
+      nextIndex = i;
+      break;
+    }
+  }
+  
+  if (prevIndex >= 0 && nextIndex >= 0) {
+    const prevValue = data[prevIndex].accounts;
+    const nextValue = data[nextIndex].accounts;
+    const gap = nextIndex - prevIndex;
+    const position = index - prevIndex;
+    return prevValue + (nextValue - prevValue) * (position / gap);
+  } else if (prevIndex >= 0) {
+    return data[prevIndex].accounts; // 向前填充
+  } else if (nextIndex >= 0) {
+    return data[nextIndex].accounts; // 向後填充
+  }
+  
+  return null;
+}
+
+function gompertzInterpolation(data, index) {
+  // Fit preliminary Gompertz to non-missing data
+  const validData = data.filter(d => !d.isMissing).map(d => d.accounts);
+  
+  if (validData.length < 8) {
+    // Fall back to linear if not enough data
+    return linearInterpolation(data, index);
+  }
+  
+  const result = fitGompertzCurve(validData);
+  if (!result || !result.valid) {
+    return linearInterpolation(data, index);
+  }
+  
+  // Evaluate at missing index
+  const value = gompertzModel(index, result.params.K, result.params.b, result.params.t0);
+  return isFinite(value) ? value : linearInterpolation(data, index);
+}
+
+function forwardFill(data, index) {
+  // Find previous valid value
+  for (let i = index - 1; i >= 0; i--) {
+    if (data[i].accounts !== null && !data[i].isMissing) {
+      return data[i].accounts;
+    }
+  }
+  
+  // If no previous, find next
+  for (let i = index + 1; i < data.length; i++) {
+    if (data[i].accounts !== null && !data[i].isMissing) {
+      return data[i].accounts;
+    }
+  }
+  
+  return null;
+}
+
+// ======================================
+// 7. SCENARIO CONFIGURATION (這是下一個區塊的開頭)
 
 // ======================================
 // 7. SCENARIO CONFIGURATION
@@ -1804,8 +2003,32 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
   
-  document.getElementById('exportCSVBtn').addEventListener('click', exportCSV);
+document.getElementById('exportCSVBtn').addEventListener('click', exportCSV);
   
+  // --- 新增：插值卡片事件 ---
+  document.querySelectorAll('input[name="interpolation"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      const method = e.target.value;
+      const impactDiv = document.getElementById('interpolationImpact');
+      
+      const descriptions = {
+        'ignore': '跳過缺漏季度。如果缺漏較少（1-2個），這是可行的簡單方法。',
+        'linear': '在相鄰值之間繪製直線。適用於趨勢較穩定的時期。',
+        'gompertz': '使用 S 型曲線估計。最適合成長數據，通常能提供最準確的估計。',
+        'forward': '重複前一個值。保守方法，適合成長停滯期。'
+      };
+      
+      impactDiv.innerHTML = `
+        <h4>方法說明</h4>
+        <p>${descriptions[method]}</p>
+      `;
+      impactDiv.style.display = 'block';
+    });
+  });
+
+  document.getElementById('applyInterpolationBtn').addEventListener('click', applyInterpolation);
+  // --- 新增結束 ---
+
   initializeSliders();
 });
     </script>
