@@ -876,7 +876,34 @@ textarea.form-control {
                 <div class="card__body">
                     <p style="margin: 0;"><strong>Gompertz 插值</strong> 通常是 S 型成長數據最準確的方法。<strong>線性插值</strong> 適用於趨勢穩定的時期。<strong>忽略</strong> 則會導致擬合時使用較少的數據點。</p>
                 </div>
+            </div> <div class="card" id="dataPreviewCard" style="display: none;">
+                <div class="card__header">
+                    <h3>數據預覽</h3>
+                </div>
+                <div class="card__body">
+                    <div class="table-container">
+                        <table class="data-table" id="dataPreviewTable">
+                            <thead>
+                                <tr>
+                                    <th>期間</th>
+                                    <th>實際數值</th>
+                                    <th>狀態</th>
+                                    <th>異常值</th>
+                                    <th>建議</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
+
+            <div class="action-buttons">
+                <button class="btn btn--primary" id="validateDataBtn">分析數據並繼續</button>
+            </div>
+
         </div>
 
         <!-- Step 2: Baseline Fitting -->
@@ -1468,7 +1495,7 @@ function displayDataPreview(data) {
       actions = '<button class="btn btn--sm btn--outline" onclick="editCell(' + index + ')">手動輸入</button>';
     } else if (row.dataType === 'Interpolated') {
       statusClass = 'status-interpolated';
-      statusBadge = '<span class.status-badge.interpolated">📊 已插值</span>';
+      statusBadge = '<span class="status-badge interpolated">📊 已插值</span>';
       recommendation = '已處理';
       actions = '<button class="btn btn--sm btn--outline" onclick="editCell(' + index + ')">修改</button>';
     } else if (row.isOutlier) {
@@ -1542,7 +1569,6 @@ function validateAndProceed() {
   }
   // --- 新增結束 ---
   
-  goToStep(2);
   goToStep(2);
   performFitting();
 }
