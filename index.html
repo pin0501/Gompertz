@@ -939,7 +939,7 @@ textarea.form-control {
                     <div id="parametersDisplay" style="display: none;">
                       <div class="params-grid">
                           <div class="param-card">
-                              <div class="param-label">K (承載容量 / TAM)</div>
+                              <div class="param-label">K (承載容量 / SAM)</div>
                               <input type="number" class="param-input" id="inputParamK">
                               <button class="btn btn--secondary btn--sm" id="refitKBtn" style="margin-top: var(--space-8); width: 100%;">固定 K 並重新擬合 b, t₀</button>
                           </div>
@@ -1015,7 +1015,7 @@ textarea.form-control {
                             <input type="range" class="slider" id="delta_t_conservative" min="0" max="4" step="0.25" value="0.5">
                         </div>
                         <div class="slider-group">
-                            <label>κ (TAM 擴張): <span id="kappa_conservative_val">2</span>%</label>
+                            <label>κ (SAM 擴張): <span id="kappa_conservative_val">2</span>%</label>
                             <input type="range" class="slider" id="kappa_conservative" min="0" max="20" step="1" value="2">
                         </div>
                         <div class="slider-group">
@@ -1041,7 +1041,7 @@ textarea.form-control {
                             <input type="range" class="slider" id="delta_t_moderate" min="0" max="4" step="0.25" value="1.0">
                         </div>
                         <div class="slider-group">
-                            <label>κ (TAM 擴張): <span id="kappa_moderate_val">5</span>%</label>
+                            <label>κ (SAM 擴張): <span id="kappa_moderate_val">5</span>%</label>
                             <input type="range" class="slider" id="kappa_moderate" min="0" max="20" step="1" value="5">
                         </div>
                         <div class="slider-group">
@@ -1067,7 +1067,7 @@ textarea.form-control {
                             <input type="range" class="slider" id="delta_t_aggressive" min="0" max="4" step="0.25" value="1.5">
                         </div>
                         <div class="slider-group">
-                            <label>κ (TAM 擴張): <span id="kappa_aggressive_val">8</span>%</label>
+                            <label>κ (SAM 擴張): <span id="kappa_aggressive_val">8</span>%</label>
                             <input type="range" class="slider" id="kappa_aggressive" min="0" max="20" step="1" value="8">
                         </div>
                         <div class="slider-group">
@@ -1497,7 +1497,7 @@ function applyIntervention(t, baselineValue, params, interventionParams, launchQ
   const cappedDeltaT = Math.min(5, Math.max(0, delta_t));
   const adjustedT0_shift = cappedDeltaT * temporaryEffectFactor;
   
-  // Kappa (TAM擴張) 是 "永久" 效應
+  // Kappa (SAM擴張) 是 "永久" 效應
   const cappedKappa = Math.min(0.2, Math.max(0, kappa));
   const capacityFactor = 1 + cappedKappa * permanentEffectFactor;
   
@@ -2549,7 +2549,7 @@ function generateFullReport() {
   // --- 2. 基線模型擬合 --- (不變)
   reportContent += "===== 2. 基線模型擬合 =====\n\n";
   reportContent += "擬合參數 (最終使用):\n";
-  reportContent += `  - K (承載容量/TAM): ${formatNumber(state.fittedParams.K)}\n`;
+  reportContent += `  - K (承載容量/SAM): ${formatNumber(state.fittedParams.K)}\n`;
   reportContent += `  - b (成長率): ${state.fittedParams.b.toFixed(4)}\n`;
   reportContent += `  - t₀ (轉折點): ${state.fittedParams.t0.toFixed(2)}\n\n`;
   
@@ -2563,7 +2563,7 @@ function generateFullReport() {
   const firstFuturePeriod = getNextQuarter(lastPeriod);
   reportContent += `平台啟動季度: ${state.platformLaunchQuarter} (即 ${firstFuturePeriod} 之後的第 ${state.platformLaunchQuarter} 季)\n\n`;
   reportContent += "介入參數:\n";
-  const configHeaders = ["情境", "α (加速)", "H (半衰期)", "Δt (拐點前移)", "κ (TAM 擴張)", "P (效應高峰)"];
+  const configHeaders = ["情境", "α (加速)", "H (半衰期)", "Δt (拐點前移)", "κ (SAM 擴張)", "P (效應高峰)"];
   const configRows = ['conservative', 'moderate', 'aggressive'].map(s => {
     const p = state.scenarioParams[s];
     return [
