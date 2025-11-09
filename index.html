@@ -1208,6 +1208,28 @@ function gompertzModel(t, K, b, t0) {
   return isFinite(result) ? result : NaN;
 }
 
+function calculateR2(data, params) {
+  const n = data.length;
+  if (n === 0) return 0;
+  
+  const mean = data.reduce((sum, val) => sum + val, 0) / n;
+  let ssRes = 0, ssTot = 0;
+  
+  for (let i = 0; i < n; i++) {
+    const predicted = gompertzModel(i, params.K, params.b, params.t0);
+    if (isFinite(predicted)) {
+      ssRes += Math.pow(data[i] - predicted, 2);
+    } else {
+      ssRes += Math.pow(data[i] - mean, 2); // 懲罰無效的預測
+    }
+    ssTot += Math.pow(data[i] - mean, 2);
+  }
+  
+  if (ssTot === 0) return 1; // 所有數據點都相同
+  const r2 = 1 - (ssRes / ssTot);
+  return isFinite(r2) ? Math.max(0, Math.min(1, r2)) : 0;
+}
+
 function fitGompertzCurve(data) {
   const n = data.length;
   const maxAccounts = Math.max(...data);
@@ -1700,6 +1722,43 @@ function displayFittingChart() {
     });
   } // displayFittingChart 結束的 }
 
+  // --- 新增：手動更新參數時觸發 ---
+  function updateManualParamsAndChart() {
+    try {
+      const newK = parseFloat(document.getElementById('inputParamK').value);
+      const newB = parseFloat(document.getElementById('inputParamB').value);
+      const newT0 = parseFloat(document.getElementById('inputParamT0').value);
+
+      if (!isFinite(newK) || !isFinite(newB) || !isFinite(newT0)) {
+        return; // 如果輸入無效 (例如空的)，則不更新
+      }
+      
+      // 更新 state
+      state.fittedParams.K = newK;
+      state.fittedParams.b = newB;
+      state.fittedParams.t0 = newT0;
+
+      // 重畫圖表
+      displayFittingChart();
+      
+      // 重新計算 R² 並更新狀態
+      const validData = state.historicalData.filter(d => !d.isMissing).map(d => d.accounts);
+      const newR2 = calculateR2(validData, state.fittedParams);
+      const statusEl = document.getElementById('fittingStatus');
+      
+      statusEl.innerHTML = `⚠️ 手動調整模式 (R² = ${newR2.toFixed(4)})`;
+      if (newR2 > 0.9) {
+        statusEl.style.color = 'var(--color-success)';
+      } else {
+        statusEl.style.color = 'var(--color-warning)';
+      }
+      
+    } catch (e) {
+      // 如果解析失敗則不執行
+      console.error("Error updating manual params:", e);
+    }
+  }  
+
 // ======================================
 // 6.5. INTERPOLATION FUNCTIONS (新增)
 // ======================================
@@ -2184,6 +2243,11 @@ document.getElementById('exportCSVBtn').addEventListener('click', exportCSV);
   });
 
   document.getElementById('applyInterpolationBtn').addEventListener('click', applyInterpolation);
+
+  // --- 新增：監聽參數輸入框的變化 ---
+  document.getElementById('inputParamK').addEventListener('input', updateManualParamsAndChart);
+  document.getElementById('inputParamB').addEventListener('input', updateManualParamsAndChart);
+  document.getElementById('inputParamT0').addEventListener('input', updateManualParamsAndChart);
   // --- 新增結束 ---
 
   initializeSliders();
