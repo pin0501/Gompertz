@@ -796,6 +796,7 @@ textarea.form-control {
                     <div class="form-group">
                         <label class="form-label" for="dataInput">貼上數據 (格式: 期間,帳戶數)</label>
                         <textarea class="form-control" id="dataInput" rows="8" placeholder="Q1 2020,28988&#10;Q2 2020,75699&#10;Q3 2020,170312&#10;..."></textarea>
+                        <div class="error-message" id="dataError" style="display: none; margin-top: var(--space-16);"></div>
                     </div>
 
                     <div class="settings-grid">
@@ -2069,8 +2070,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('loadSampleBtn').addEventListener('click', loadSampleData);
   document.getElementById('clearDataBtn').addEventListener('click', () => {
     document.getElementById('dataInput').value = '';
-    document.getElementById('dataPreviewCard').style.display = 'none';
-    state.historicalData = [];
+    parseAndDisplayData(); // 呼叫此函式來處理所有 UI 更新
   });
   
   document.getElementById('dataInput').addEventListener('input', parseAndDisplayData);
