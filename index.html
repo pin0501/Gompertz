@@ -1234,6 +1234,29 @@ function showToast(message, duration = 3000) {
   }, duration);
 }
 
+// --- 新增：遺失的頁面導航函式 ---
+function goToStep(stepNumber) {
+  document.querySelectorAll('.step-page').forEach(page => {
+    page.style.display = 'none';
+  });
+  
+  const stepPage = document.getElementById('step' + stepNumber);
+  if (stepPage) {
+    stepPage.style.display = 'block';
+  } else {
+    console.error('找不到步驟頁面: step' + stepNumber);
+  }
+  
+  // 更新頂部的步驟指示器
+  document.querySelectorAll('.step-indicator').forEach(indicator => {
+    indicator.classList.remove('active');
+    const indicatorStep = parseInt(indicator.getAttribute('data-step') || '0');
+    if (indicatorStep > 0 && indicatorStep <= stepNumber) {
+      indicator.classList.add('active');
+    }
+  });
+}
+
 // --- 新增：純文字表格格式化工具 ---
 function formatTextTable(headers, rows) {
   // 決定每列的最大寬度 (帶有 padding)
