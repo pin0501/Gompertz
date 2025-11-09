@@ -1023,6 +1023,18 @@ function parseQuarter(quarterStr) {
   return { quarter: parseInt(match[1]), year: parseInt(match[2]) };
 }
 
+function getNextQuarter(periodStr) {
+  const parsed = parseQuarter(periodStr);
+  if (!parsed) return null;
+  let { quarter, year } = parsed;
+  quarter++;
+  if (quarter > 4) {
+    quarter = 1;
+    year++;
+  }
+  return `Q${quarter} ${year}`;
+}
+
 function generateQuarters(startQuarter, numQuarters) {
   const parsed = parseQuarter(startQuarter);
   if (!parsed) return [];
@@ -1204,23 +1216,73 @@ function parseAndDisplayData() {
       }
       
       const period = parts[0].trim();
-      const accounts = parseFloat(parts[1].trim());
+      const accountsStr = parts[1].trim();
       
-      if (isNaN(accounts) || accounts < 0) {
-        throw new Error(`無效的帳戶數: ${parts[1]}`);
+      let accounts = null;
+      let isMissing = false;
+      
+      // 處理 'x', 'X', 'na' 等無效值
+      if (accountsStr === '' || accountsStr === '-' || accountsStr.toLowerCase() === 'null' || accountsStr.toLowerCase() === 'na' || accountsStr.toLowerCase() === 'x') {
+        isMissing = true;
+      } else {
+        accounts = parseFloat(accountsStr);
+        if (isNaN(accounts)) {
+          accounts = null;
+          isMissing = true;
+        } else if (accounts < 0) {
+          throw new Error(`帳戶數不能為負數: ${accountsStr}`);
+        }
       }
       
-      data.push({ period, accounts, dataType: 'Original' });
+      data.push({ period, accounts, isMissing, dataType: isMissing ? 'Missing' : 'Original' });
     }
     
-    if (data.length < 8) {
-      throw new Error('至少需要 8 個數據點進行擬合');
+    // --- 新增：填補時間間隙 ---
+    if (data.length < 2) {
+      if (data.length === 0) throw new Error('請輸入數據');
+      state.historicalData = data; 
+    } else {
+      const filledData = [];
+      const dataMap = new Map(data.map(d => [d.period, d]));
+      
+      let currentPeriod = data[0].period;
+      const lastPeriod = data[data.length - 1].period;
+      
+      filledData.push(data[0]); 
+      
+      let safetyBreak = 0; 
+      while (currentPeriod !== lastPeriod && safetyBreak < 200) {
+          const nextPeriod = getNextQuarter(currentPeriod);
+          if (!nextPeriod) {
+            console.error('無法從 ' + currentPeriod + ' 解析下一個季度');
+            break; 
+          }
+          
+          if (dataMap.has(nextPeriod)) {
+              filledData.push(dataMap.get(nextPeriod));
+          } else {
+              // 找到間隙！補上缺漏值
+              filledData.push({
+                  period: nextPeriod,
+                  accounts: null,
+                  isMissing: true,
+                  dataType: 'Missing (Gap)'
+              });
+          }
+          currentPeriod = nextPeriod;
+          safetyBreak++;
+      }
+      state.historicalData = filledData;
+    }
+    // --- 結束：填補時間間隙 ---
+
+    if (state.historicalData.length < 8) {
+      throw new Error('總數據點（包含填補的間隙）少於 8 個');
     }
     
-    state.historicalData = data;
     analyzeDataQuality();
     displayDataQualityReport();
-    displayDataPreview(data);
+    displayDataPreview(state.historicalData); // 改為使用 state.historicalData
     errorEl.style.display = 'none';
     
   } catch (error) {
@@ -1233,16 +1295,40 @@ function analyzeDataQuality() {
   const data = state.historicalData;
   const issues = [];
   let score = 100;
+
+  // 真正計算缺漏值
+  const missingCount = data.filter(d => d.isMissing).length;
+  const validCount = data.length - missingCount;
+
+  if (missingCount === 0) {
+    issues.push({
+      type: 'success',
+      icon: '✓',
+      title: '數據完整性: 優異',
+      description: `所有 ${data.length} 個季度的數據都存在`
+    });
+  } else {
+    issues.push({
+      type: 'warning',
+      icon: '⚠️',
+      title: `數據缺漏: ${missingCount} 個季度缺漏`,
+      description: '檢測到時間間隙或無效數據。缺漏數據已在預覽表中標記。'
+    });
+    score -= missingCount * 5; // 每個缺漏扣 5 分
+  }
   
-  issues.push({
-    type: 'success',
-    icon: '✓',
-    title: '數據完整性: 優異',
-    description: `所有 ${data.length} 個季度的數據都存在`
-  });
-  
+  if (validCount < 8) {
+    issues.push({
+      type: 'error',
+      icon: '❌',
+      title: '有效數據點不足',
+      description: `僅有 ${validCount} 個有效數據點，至少需要 8 個才能可靠擬合。`
+    });
+    score -= 50; // 嚴重扣分
+  }
+
   score = Math.max(0, Math.min(100, score));
-  state.dataQuality = { score, issues, validCount: data.length, totalCount: data.length };
+  state.dataQuality = { score, issues, validCount, totalCount: data.length, missingCount };
 }
 
 function displayDataQualityReport() {
@@ -1253,11 +1339,20 @@ function displayDataQualityReport() {
   const scoreValue = document.getElementById('qualityScoreValue');
   
   scoreFill.style.width = quality.score + '%';
-  scoreValue.textContent = '✓ ' + quality.score + '/100';
+  scoreValue.textContent = quality.score + '/100';
+  
+  // 根據分數改變顏色和圖示
+  if (quality.score < 100) {
+    scoreFill.style.background = 'var(--color-warning)'; // 變為警告色
+    scoreValue.textContent = '⚠️ ' + quality.score + '/100';
+  } else {
+    scoreFill.style.background = 'var(--color-success)';
+    scoreValue.textContent = '✓ ' + quality.score + '/100';
+  }
   
   const issuesContainer = document.getElementById('qualityIssues');
   issuesContainer.innerHTML = quality.issues.map(issue => `
-    <div style="padding: var(--space-8); margin-bottom: var(--space-8); background: var(--color-bg-3); border-radius: var(--radius-base);">
+    <div style="padding: var(--space-8); margin-bottom: var(--space-8); background: ${issue.type === 'success' ? 'var(--color-bg-3)' : 'var(--color-bg-2)'}; border-radius: var(--radius-base);">
       <div style="font-weight: var(--font-weight-semibold);">${issue.icon} ${issue.title}</div>
       <div style="font-size: var(--font-size-sm); color: var(--color-text-secondary);">${issue.description}</div>
     </div>
@@ -1272,11 +1367,22 @@ function displayDataPreview(data) {
   
   data.forEach((row) => {
     const tr = document.createElement('tr');
-    const statusBadge = '<span class="status-badge valid">✓ 正常</span>';
+    
+    let statusBadge;
+    let valueDisplay;
+    
+    // 根據 isMissing 屬性來決定顯示內容
+    if (row.isMissing) {
+        statusBadge = '<span class="status-badge missing">⚠️ 缺漏</span>';
+        valueDisplay = '<em style="color: var(--color-text-secondary);">N/A</em>';
+    } else {
+        statusBadge = '<span class="status-badge valid">✓ 正常</span>';
+        valueDisplay = formatNumber(row.accounts);
+    }
     
     tr.innerHTML = `
       <td>${row.period}</td>
-      <td>${formatNumber(row.accounts)}</td>
+      <td>${valueDisplay}</td>
       <td>${statusBadge}</td>
     `;
     tbody.appendChild(tr);
@@ -1305,7 +1411,17 @@ function performFitting() {
   paramsEl.style.display = 'none';
   
   setTimeout(() => {
-    const accounts = state.historicalData.map(d => d.accounts);
+    // --- 修正：在擬合前過濾掉缺漏的數據 ---
+    const validData = state.historicalData.filter(d => !d.isMissing);
+    const accounts = validData.map(d => d.accounts);
+    
+    if (accounts.length < 8) {
+        statusEl.textContent = '✘ 擬合失敗：有效數據點不足 (少於 8 個)';
+        statusEl.style.color = 'var(--color-error)';
+        return;
+    }
+    // --- 修正結束 ---
+    
     const result = fitGompertzCurve(accounts);
     
     if (!result) {
